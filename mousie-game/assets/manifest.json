@@ -1,0 +1,154 @@
+{
+  "characters": {
+    "mousie": {
+      "file": "chars/mousie.png",
+      "w": 765,
+      "h": 900,
+      "facing": "right",
+      "feet": 0.991,
+      "credit": {
+        "title": "Mousie walking (cover)",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 1)"
+      }
+    },
+    "daddy": {
+      "file": "chars/daddy.png",
+      "w": 667,
+      "h": 900,
+      "facing": "left",
+      "feet": 0.991,
+      "credit": {
+        "title": "Daddy mouse",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 2)"
+      }
+    },
+    "birdie": {
+      "file": "chars/birdie.png",
+      "w": 597,
+      "h": 581,
+      "facing": "right",
+      "feet": 0.981,
+      "credit": {
+        "title": "Birdie (standing p3; flying with arrows p4)",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 3)"
+      },
+      "poses": {
+        "fly": {
+          "file": "chars/birdie-fly.png",
+          "w": 708,
+          "h": 619,
+          "facing": "right",
+          "feet": 0.5
+        }
+      }
+    },
+    "raptor": {
+      "credit": {
+        "title": "Velociraptor (defeated)",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 4)"
+      },
+      "poses": {
+        "dead": {
+          "file": "chars/raptor-dead.png",
+          "w": 900,
+          "h": 430,
+          "facing": "left",
+          "feet": 0.979
+        }
+      }
+    },
+    "trex": {
+      "file": "chars/trex.png",
+      "w": 900,
+      "h": 770,
+      "facing": "right",
+      "feet": 0.99,
+      "credit": {
+        "title": "T-Rex roaring (p5 top); knocked out by the BOOM (p5 bottom)",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 5)"
+      },
+      "poses": {
+        "roar": {
+          "file": "chars/trex-roar.png",
+          "w": 900,
+          "h": 770,
+          "facing": "right",
+          "feet": 0.99
+        },
+        "dead": {
+          "file": "chars/trex-dead.png",
+          "w": 641,
+          "h": 632,
+          "facing": "right",
+          "feet": 0.987
+        }
+      }
+    },
+    "snake": {
+      "file": "chars/snake.png",
+      "w": 445,
+      "h": 477,
+      "facing": "left",
+      "feet": 0.983,
+      "credit": {
+        "title": "Snake",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 6)"
+      }
+    },
+    "lion": {
+      "file": "chars/lion.png",
+      "w": 439,
+      "h": 505,
+      "facing": "left",
+      "feet": 0.984,
+      "credit": {
+        "title": "Lion standing and running away",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 6)"
+      },
+      "poses": {
+        "run": {
+          "file": "chars/lion-run.png",
+          "w": 686,
+          "h": 421,
+          "facing": "right",
+          "feet": 0.976
+        }
+      }
+    },
+    "firetruck": {
+      "file": "chars/firetruck.png",
+      "w": 520,
+      "h": 349,
+      "facing": "right",
+      "feet": 0.977,
+      "credit": {
+        "title": "Fire truck",
+        "author": "Samar (age 6)",
+        "license": "Family artwork, all rights reserved",
+        "licenseUrl": "",
+        "source": "Mousie, Part 1 (page 6)"
+      }
+    }
+  }
+}
