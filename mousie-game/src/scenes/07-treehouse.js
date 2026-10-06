@@ -48,7 +48,8 @@ SCENES.treehouse = {
     // front() runs just before the engine draws bubbles, so it never flashes in the wrong place
     if (c.bubble && c.bubble.who !== "Birdie") { c.own = { ...c.bubble, beat: c.beat }; c.bubble = null; }
     const d = c.actors.daddy;
-    if (d.visible && c.wave) treehouseDrawWave(d, c.t);
+    d.o.wave = !!c.wave; // painted Daddy wiggles happily (photo.js)
+    if (d.visible && c.wave && !photoHas("daddy")) treehouseDrawWave(d, c.t);
     // lines spoken up on the platform
     const b = c.own;
     if (!b || b.beat !== c.beat || uprightPhone.matches) return; // upright phones show the words in the caption

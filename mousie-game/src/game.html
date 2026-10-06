@@ -95,6 +95,22 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 .act .fill { position: absolute; left: 0; bottom: 0; height: 6px; background: #fff6; width: 0; }
 .pulse { animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.07); } }
+/* Credits sheet (photo & art licences) */
+#title .info { position: absolute; right: 12px; bottom: 12px; padding: 4px 12px; font-size: 1.1rem; }
+.credits-btn { margin-top: 2px; }
+#credits { position: fixed; inset: 0; z-index: 50; background: rgba(40, 28, 18, .55); display: flex; align-items: center; justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+#credits .sheet { background: var(--paper); border: 4px solid var(--ink); border-radius: 18px; width: min(680px, 100%); max-height: 100%;
+  display: flex; flex-direction: column; overflow: hidden; user-select: text; -webkit-user-select: text; }
+#credits .sheet-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 3px solid var(--ink); background: var(--paper-2); }
+#credits h2 { flex: 1; margin: 0; font-family: var(--display); font-size: 1.4rem; }
+#credits ul { list-style: none; margin: 0; padding: 8px 16px 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+#credits li { padding: 10px 0; border-bottom: 2px dashed #d9c9a4; font-size: .95rem; line-height: 1.35; }
+#credits li:last-child { border-bottom: 0; }
+#credits li p { margin: 2px 0 0; overflow-wrap: anywhere; }
+#credits .kind { display: block; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sky); }
+#credits .url { color: #8a7a6a; font-size: .85em; }
+#credits a { color: var(--sky); }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } .bubble { transition: none; } }
 @media (max-width: 640px) {
   .act { min-width: 130px; padding: 12px 18px; }
@@ -147,6 +163,7 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   #title img, #end img { max-height: 45%; }
   .big-title { font-size: 2.2rem; }
   .credit { font-size: .85rem; }
+  .credits-btn { font-size: .8rem; padding: 2px 10px; }
   #help { font-size: .78rem; padding: 3px 12px; top: 4px; border-width: 2px; max-width: 80%; }
 }
 </style>
@@ -167,16 +184,24 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
       <img src="__ART_cover__" alt="Mousie walking on a green path">
       <h1 class="big-title">Mousie</h1>
       <p class="credit">The Adventure Game · Story &amp; pictures by <strong>Samar</strong></p>
+      <button class="chip info" id="creditsTitle" type="button" aria-label="Photo and art credits" title="Photo &amp; art credits">ⓘ</button>
     </div>
     <div id="end" class="overlay" hidden>
       <img src="__ART_treehouse__" alt="Mousie climbing to the treehouse">
       <h1 class="big-title">The End!</h1>
       <p class="credit" id="endStats"></p>
       <p class="credit">Story &amp; pictures by <strong>Samar</strong> · Part 1</p>
+      <button class="chip credits-btn" id="creditsEnd" type="button">📜 Photo &amp; art credits</button>
     </div>
   </main>
   <div id="caption" aria-live="polite"><b id="capWho"></b><span id="capText"></span></div>
   <nav id="controls"></nav>
+</div>
+<div id="credits" hidden role="dialog" aria-modal="true" aria-labelledby="creditsHead">
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="creditsHead">Photo &amp; art credits</h2><button class="chip" id="creditsClose" type="button">✕ Close</button></div>
+    <ul id="creditsList"></ul>
+  </div>
 </div>
 
 <script>
@@ -320,6 +345,7 @@ function setControls(list) {
   return list;
 }
 document.addEventListener("keydown", (e) => {
+  if (!$("credits").hidden) { if (e.key === "Escape") closeCredits(); return; }
   if (e.repeat) return;
   const b = keyMap[e.key] || keyMap[e.key.toLowerCase()];
   if (b && !b.el.disabled) {
@@ -328,6 +354,18 @@ document.addEventListener("keydown", (e) => {
   }
 });
 const NEXT_KEYS = [" ", "Enter", "ArrowRight"];
+// Credits for every painting and photo used (CC BY / BY-SA need this).
+let creditsFrom = null;
+function openCredits(e) {
+  creditsFrom = e && e.currentTarget;
+  photoFillCredits($("creditsList"));
+  $("credits").hidden = false; $("creditsList").scrollTop = 0; $("creditsClose").focus();
+}
+function closeCredits() { $("credits").hidden = true; if (creditsFrom) creditsFrom.focus(); }
+$("creditsTitle").onclick = openCredits;
+$("creditsEnd").onclick = openCredits;
+$("creditsClose").onclick = closeCredits;
+$("credits").addEventListener("click", (e) => { if (e.target === $("credits")) closeCredits(); });
 
 /* ---------------- game state & flow ---------------- */
 const game = { step: -1, cheese: 0, stars: 0 };
@@ -340,7 +378,9 @@ function showOnly(id) {
 function goTitle() {
   stopSpeech(); scene = null; cut = null; game.step = -1; game.cheese = 0; game.stars = 0;
   showOnly("title"); $("chapter").textContent = "The Adventure Game";
-  setControls([{ icon: "▶", label: "Play!", color: "green", pulse: true, tap: true, keys: NEXT_KEYS, keyName: "space", fn: () => goStep(0) }]);
+  const ready = photoReady(); // the paintings and photos load first (a press while loading starts the game when ready)
+  setControls([{ icon: ready ? "▶" : "⏳", label: ready ? "Play!" : "Loading…", color: ready ? "green" : "gray", pulse: ready, tap: true, keys: NEXT_KEYS, keyName: "space",
+    fn: () => { if (photoReady()) goStep(0); else PH.playAsap = true; } }]);
 }
 function next() { sfx.click(); goStep(game.step + 1); }
 function goStep(i) {
@@ -362,7 +402,10 @@ const SCENES = {};
 let cut = null;
 
 function actor(draw, x, y, s = 1, more = {}) {
-  return Object.assign({ draw, x, y, s, flip: false, o: {}, tx: null, speed: 160, vy: 0, jy: 0, alpha: 1, rot: 0, visible: true, z: 0, head: 120, fly: false, walk: false, walkScroll: false }, more);
+  const a = Object.assign({ draw, x, y, s, flip: false, o: {}, tx: null, speed: 160, vy: 0, jy: 0, alpha: 1, rot: 0, visible: true, z: 0, head: 120, fly: false, walk: false, walkScroll: false }, more);
+  const ph = a.head > 0 && photoHead(draw, a); // speech bubbles sit on the painted character's head
+  if (ph) a.head = ph;
+  return a;
 }
 function moveTo(a, x, speed = 160) { a.tx = x; a.speed = speed; }
 function hop(a, v = 520) { if (a.jy === 0) a.vy = -v; }
@@ -437,13 +480,14 @@ function updateCut(dt) {
 function drawCut() {
   const c = cut;
   c.def.bg(c);
+  photoAfterBg();
   const list = Object.values(c.actors).filter((a) => a.visible).sort((a, b) => a.z - b.z);
   for (const a of list) {
     ctx.save();
     ctx.globalAlpha = a.alpha;
     const walking = a.tx !== null || a.walk || (a.walkScroll && c.scrollSpeed > 0);
     const bob = a.fly ? Math.sin(c.t * 3 + a.x * 0.01) * 10 : 0;
-    a.draw(a.x, a.y + a.jy + bob, a.s, { t: c.t + a.x * 0.001, walk: walking, flip: a.flip, rot: a.rot, ...a.o });
+    a.draw(a.x, a.y + a.jy + bob, a.s, { t: c.t + a.x * 0.001, walk: walking, flip: a.flip, rot: a.rot, jy: a.jy, ...a.o });
     ctx.restore();
   }
   if (c.def.front) c.def.front(c);
@@ -562,7 +606,8 @@ function drawFx() {
   ctx.globalAlpha = 1;
 }
 
-/* ---------------- character drawings (all face right; flip = face left) ---------------- */
+/* ---------------- character drawings (all face right; flip = face left) ----------------
+   Each one draws the cut-out painting from the comic instead when it is available (see photo.js). */
 const INK = "#3b2a1e";
 function ell(x, y, rx, ry, fill, rot = 0, stroke = true) {
   ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
@@ -584,6 +629,7 @@ function eyeX(x, y) {
 function eye(x, y, r = 4) { ell(x, y, r, r * 1.1, INK, 0, false); ell(x + r * 0.35, y - r * 0.4, r * 0.35, r * 0.35, "#fff", 0, false); }
 
 function drawMouse(x, y, s = 1, o = {}) {
+  if (photoChar(o.color ? "daddy" : "mousie", x, y, s, o)) return; // Samar's painting, when there is one
   const t = o.t || 0, walk = o.walk ? Math.sin(t * 14) : 0;
   begin(x, y, s, o.flip, o.rot);
   const BR = o.color || "#a57a52", PINK = "#f2a7a7";
@@ -610,6 +656,7 @@ function drawMouse(x, y, s = 1, o = {}) {
   ctx.restore();
 }
 function drawBird(x, y, s = 1, o = {}) {
+  if (photoChar("birdie", x, y, s, o)) return; // Samar's painting, when there is one
   const t = o.t || 0;
   begin(x, y, s, o.flip, o.rot);
   poly([-26, 0, -54, -10, -50, 10], "#2c5fa8");
@@ -626,6 +673,7 @@ function drawBird(x, y, s = 1, o = {}) {
   ctx.restore();
 }
 function drawRaptor(x, y, s = 1, o = {}) {
+  if (photoChar("raptor", x, y, s, o)) return; // Samar's painting, when there is one
   const t = o.t || 0, step = o.walk ? Math.sin(t * 8) : 0;
   begin(x, y, s, o.flip, o.rot);
   const C = o.hurt > 0 ? "#f3d6d6" : "#8d9cab", D = "#5e6d7b";
@@ -649,6 +697,7 @@ function drawRaptor(x, y, s = 1, o = {}) {
   ctx.restore();
 }
 function drawTRex(x, y, s = 1, o = {}) {
+  if (photoChar("trex", x, y, s, o)) return; // Samar's painting, when there is one
   const t = o.t || 0, jaw = o.roar ? 0.55 : 0.2 + Math.sin(t * 3) * 0.08;
   begin(x, y, s, o.flip, o.rot);
   const G = o.hurt > 0 ? "#f6dcc8" : "#5a9e4b", D = "#3d7a33";
@@ -671,6 +720,7 @@ function drawTRex(x, y, s = 1, o = {}) {
   ctx.restore();
 }
 function drawSnake(x, y, s = 1, o = {}) {
+  if (photoChar("snake", x, y, s, o)) return; // Samar's painting, when there is one
   const t = o.t || 0, wig = o.wiggle ? 18 : 5;
   begin(x, y, s, o.flip, o.rot);
   const pts = [];
@@ -686,6 +736,7 @@ function drawSnake(x, y, s = 1, o = {}) {
   ctx.restore();
 }
 function drawLion(x, y, s = 1, o = {}) {
+  if (photoChar("lion", x, y, s, o)) return; // Samar's painting, when there is one
   const t = o.t || 0, run = o.run ? Math.sin(t * 20) : 0;
   begin(x, y, s, o.flip, o.rot);
   const Y = "#e2b25a";
@@ -701,6 +752,7 @@ function drawLion(x, y, s = 1, o = {}) {
   ctx.restore();
 }
 function drawTruck(x, y, s = 1, o = {}) {
+  if (photoChar("firetruck", x, y, s, o)) return; // Samar's painting, when there is one
   const t = o.t || 0;
   begin(x, y, s, o.flip, o.rot);
   ctx.fillStyle = "#d8342c";
@@ -720,6 +772,7 @@ function drawTruck(x, y, s = 1, o = {}) {
 
 /* ---------------- backgrounds ---------------- */
 function drawForest(scroll = 0, tint = 0) {
+  if (photoForest(scroll, tint)) return;
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#bfe3e8"); g.addColorStop(0.7, "#eaf3d6"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#a8cf8e";
@@ -742,6 +795,7 @@ function drawForest(scroll = 0, tint = 0) {
 }
 // Big leaves that sweep past in front of the characters while walking.
 function drawJungleFront(scroll) {
+  if (photoJungleFront(scroll)) return;
   const span = 1500;
   for (let i = 0; i < 5; i++) {
     const x = ((i * 330 - scroll * 1.5) % span + span) % span - 200;
@@ -756,6 +810,7 @@ function drawJungleFront(scroll) {
   }
 }
 function drawCave(scroll = 0, hole = true) {
+  if (photoCave(scroll, hole)) return;
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#3a2e26"); g.addColorStop(1, "#55463a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   const r = ctx.createRadialGradient(80, 320, 20, 80, 320, 420);
@@ -771,6 +826,7 @@ function drawCave(scroll = 0, hole = true) {
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(W, GROUND); ctx.stroke();
 }
 function drawCaveMouth(x) {
+  if (photoCaveMouth(x)) return;
   ctx.fillStyle = "#8a7a6a"; ctx.beginPath(); ctx.ellipse(x, GROUND, 170, 230, 0, Math.PI, 0); ctx.fill();
   ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.stroke();
   ctx.fillStyle = "#1e1814"; ctx.beginPath(); ctx.ellipse(x, GROUND, 95, 160, 0, Math.PI, 0); ctx.fill();
@@ -817,6 +873,10 @@ function drawObstacle(o) {
     ctx.restore();
   }
 }
+
+/* ---------------- photo mode (src/photo.js, inlined by build.py) ---------------- */
+const PHOTOS = /*__PHOTOS__*/null;
+/*__PHOTO_JS__*/
 
 /* ---------------- levels ---------------- */
 const LEVELS = {
@@ -868,9 +928,10 @@ const LEVELS = {
     draw(s) {
       drawForest(s.dist);
       if (s.caveX !== null) drawCaveMouth(s.caveX);
+      photoAfterBg();
       s.cheese.forEach((c) => drawCheese(c.x, c.y + Math.sin(s.t * 4 + c.x) * 4));
       s.obs.forEach(drawObstacle);
-      drawMouse(200, GROUND + s.my, 1, { t: s.t, walk: s.my === 0 && !s.won, dizzy: s.stun > 0 });
+      drawMouse(200, GROUND + s.my, 1, { t: s.t, walk: s.my === 0 && !s.won, dizzy: s.stun > 0, jy: s.my });
       drawBird(330, 230 + Math.sin(s.t * 2) * 20, 0.9, { t: s.t });
       drawProgress(s.dist / s.goal, "🐭", "🕳️");
       drawCheeseCount();
@@ -907,8 +968,12 @@ const LEVELS = {
     },
     draw(s) {
       drawCave();
-      drawMouse(200, GROUND + s.my, 1, { t: s.t });
-      drawRaptor(s.rx, GROUND - 165 * (s.flop || 0), 1.35, { t: s.t, walk: !s.dead, flip: true, hurt: s.hurt, dead: s.dead, rot: s.rot });
+      photoAfterBg();
+      drawMouse(200, GROUND + s.my, 1, { t: s.t, jy: s.my });
+      if (s.dead && photoHas("raptor", "dead")) { // the painting already lies down: drop it with a little bounce
+        const f = Math.min(1, s.flop || 0);
+        drawRaptor(Math.min(s.rx, W - 190), GROUND - Math.sin(f * Math.PI) * 40, 1.35, { t: s.t, flip: true, dead: true, jy: -Math.sin(f * Math.PI) * 40 });
+      } else drawRaptor(s.rx, GROUND - 165 * (s.flop || 0), 1.35, { t: s.t, walk: !s.dead, flip: true, hurt: s.hurt, dead: s.dead, rot: s.rot });
       drawBird(300, 250 + Math.sin(s.t * 2) * 15, 1, { t: s.t, bow: true });
       s.arrows.forEach((a) => {
         ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(Math.atan2(a.vy, a.vx));
@@ -974,7 +1039,8 @@ const LEVELS = {
     },
     draw(s) {
       drawCave();
-      drawTRex(s.rx, GROUND, 1.15, { t: s.t, flip: true, roar: s.roar > 0, hurt: s.hurt, dead: s.dead, rot: s.rot });
+      photoAfterBg();
+      drawTRex(s.rx, GROUND, 1.15, { t: s.t, flip: true, roar: s.roar > 0, hurt: s.hurt, dead: s.dead, rot: s.dead && photoHas("trex", "dead") ? 0 : s.rot });
       drawMouse(200, GROUND, 1, { t: s.t });
       drawBird(310, 220 + Math.sin(s.t * 2) * 15, 1, { t: s.t, bow: true });
       s.arrows.forEach((a) => {
@@ -1028,13 +1094,14 @@ const LEVELS = {
     },
     draw(s) {
       drawForest(0);
+      photoAfterBg();
       const bounce = s.dance > 0 ? -Math.abs(Math.sin(s.t * 10)) * 30 : 0;
-      drawMouse(250, GROUND + bounce, 1, { t: s.t });
+      drawMouse(250, GROUND + bounce, 1, { t: s.t, jy: bounce });
       drawBird(400, 270 + Math.sin(s.t * (s.sing > 0 ? 10 : 2)) * (s.sing > 0 ? 30 : 10), 1, { t: s.t });
       drawSnake(620, GROUND, 1.3, { t: s.t, wiggle: s.wiggle > 0, flip: true });
       s.birds.forEach((b) => drawBird(b.x, b.y, 0.4, { t: s.t + b.x }));
       if (s.lion !== null) drawLion(s.lion, GROUND, 1.3, { t: s.t, run: true });
-      if (s.truck !== null) drawTruck(s.truck, GROUND, 1.1, { t: s.t });
+      if (s.truck !== null) drawTruck(s.truck, GROUND, 1.1, { t: s.t, walk: true });
       // checklist
       ["lion", "truck", "snake", "bird"].forEach((k, i) => {
         ctx.font = "38px sans-serif"; ctx.textAlign = "center";
@@ -1057,6 +1124,7 @@ const LEVELS = {
     update(s, dt) { s.y += (s.ty - s.y) * Math.min(1, dt * 10); },
     draw(s) {
       drawTreeHouse(s.total);
+      photoAfterBg();
       drawMouse(555, s.y, 0.9, { t: s.t, walk: Math.abs(s.ty - s.y) > 2 });
       drawBird(720, 230 + Math.sin(s.t * 2) * 12, 0.9, { t: s.t, flip: true });
       ctx.font = 'bold 30px "Chalkboard SE", "Comic Sans MS", cursive'; ctx.textAlign = "left"; ctx.lineWidth = 5; ctx.strokeStyle = INK;
@@ -1067,6 +1135,7 @@ const LEVELS = {
 
 // The big tree with the treehouse and a ladder (ladder top is at y = 170, x ≈ 555).
 function drawTreeHouse(rungs = 10, scroll = 300, forest = true) {
+  if (photoTreeHouse(rungs, forest)) return;
   if (forest) drawForest(scroll, 0.12);
   // tree trunk & branches
   ctx.fillStyle = "#7a5534"; ctx.strokeStyle = INK; ctx.lineWidth = 4;

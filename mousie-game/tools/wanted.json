@@ -1,0 +1,142 @@
+{
+  "_comment": "Background photos for Mousie. queries = Wikimedia Commons search (CirrusSearch syntax); pin = files tried first; ground = floor line per file (fraction of image height), default_ground otherwise. Re-run tools/fetch_assets.py after editing.",
+  "reject_terms": [
+    "panorama",
+    "360",
+    "equirectangular",
+    "color checker",
+    "hdri"
+  ],
+  "backgrounds": {
+    "jungle": {
+      "about": "lush tropical rainforest at eye level, clear path / forest floor across the bottom",
+      "queries": [
+        "rainforest trail filetype:bitmap filew:>1800",
+        "tropical rainforest path filetype:bitmap filew:>1800",
+        "jungle path filetype:bitmap filew:>1800",
+        "rainforest Costa Rica trail filetype:bitmap filew:>1800",
+        "rainforest Borneo trail filetype:bitmap filew:>1800",
+        "jungle undergrowth filetype:bitmap filew:>1800",
+        "tropical forest understory filetype:bitmap filew:>1800"
+      ],
+      "prefer_terms": [
+        "rainforest",
+        "jungle",
+        "trail",
+        "path",
+        "tropical",
+        "forest floor",
+        "costa rica",
+        "borneo",
+        "amazon",
+        "understory",
+        "undergrowth"
+      ],
+      "avoid_terms": [
+        "aerial",
+        "canopy walk",
+        "river",
+        "waterfall",
+        "road",
+        "bridge",
+        "sunset",
+        "night",
+        "gravel",
+        "boardwalk",
+        "temperate",
+        "quinault",
+        "gate"
+      ],
+      "min_aspect": 1.3,
+      "default_ground": 0.85,
+      "pin": [],
+      "ground": {}
+    },
+    "cave_outside": {
+      "about": "cave entrance/mouth in rock among trees or jungle, entrance centre or right, ground in front",
+      "queries": [
+        "cave entrance forest filetype:bitmap filew:>1800",
+        "cave entrance jungle filetype:bitmap filew:>1800",
+        "cave mouth trees filetype:bitmap filew:>1800",
+        "cave entrance rainforest filetype:bitmap filew:>1800",
+        "limestone cave entrance filetype:bitmap filew:>1800"
+      ],
+      "prefer_terms": [
+        "cave entrance",
+        "cave mouth",
+        "forest",
+        "jungle",
+        "entrance"
+      ],
+      "avoid_terms": [
+        "inside",
+        "interior",
+        "sea cave",
+        "aerial",
+        "gate",
+        "mine"
+      ],
+      "min_aspect": 1.3,
+      "default_ground": 0.85,
+      "pin": [],
+      "ground": {}
+    },
+    "cave_inside": {
+      "about": "inside a cave with some light, rocky floor across the bottom, stalactites welcome",
+      "queries": [
+        "cave interior stalactites filetype:bitmap filew:>1800",
+        "cave chamber filetype:bitmap filew:>1800",
+        "inside cave light entrance filetype:bitmap filew:>1800",
+        "cave stalactites stalagmites filetype:bitmap filew:>1800",
+        "limestone cave inside filetype:bitmap filew:>1800"
+      ],
+      "prefer_terms": [
+        "chamber",
+        "stalactite",
+        "interior",
+        "inside",
+        "hall"
+      ],
+      "avoid_terms": [
+        "mine",
+        "tunnel",
+        "underwater",
+        "ice cave",
+        "glacier",
+        "railing",
+        "walkway"
+      ],
+      "min_aspect": 1.3,
+      "min_brightness": 35,
+      "default_ground": 0.86,
+      "pin": [],
+      "ground": {}
+    },
+    "treehouse": {
+      "about": "big tree with a wooden treehouse on a platform, ground visible at the base (fallback: huge old tree trunk with ground)",
+      "queries": [
+        "treehouse filetype:bitmap filew:>1800",
+        "tree house wooden filetype:bitmap filew:>1800",
+        "treehouse forest filetype:bitmap filew:>1800",
+        "incategory:Tree_houses filetype:bitmap",
+        "huge old tree trunk filetype:bitmap filew:>1800"
+      ],
+      "prefer_terms": [
+        "treehouse",
+        "tree house",
+        "tree-house",
+        "baumhaus"
+      ],
+      "avoid_terms": [
+        "hotel",
+        "restaurant",
+        "interior",
+        "inside"
+      ],
+      "min_aspect": 1.3,
+      "default_ground": 0.88,
+      "pin": [],
+      "ground": {}
+    }
+  }
+}
