@@ -1,0 +1,14 @@
+{
+  "name": "wish-circle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wish Circle: a private, local-first kids' PWA that turns a child's story book into comic pages and a game.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "NODE_PATH=$(npm root -g) node tests/e2e.mjs",
+    "serve": "python3 -m http.server 8000"
+  }
+}

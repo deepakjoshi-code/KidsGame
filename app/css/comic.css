@@ -1,0 +1,289 @@
+/* Comic reader. Everything is scoped under .comic so it can't disturb other screens. */
+.comic {
+  --c-paper: #fbf4e2;
+  --c-ink: #3b2a1e;
+  --c-caption: #ffe873;
+  --c-accent: #f0a040;
+  --c-display: "Chalkboard SE", "Comic Sans MS", "Marker Felt", cursive;
+  color: var(--c-ink);
+  background: var(--c-paper);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.comic-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing: border-box;
+}
+.comic-print { display: none; }
+
+/* Top bar (app.css styles .topbar too; these keep it tidy on its own). */
+.comic-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 56px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+.comic-topbar .topbar-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: 700 1.3rem/1.2 var(--c-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comic-topbar .topbar-actions { display: flex; gap: 6px; flex: 0 1 auto; flex-wrap: nowrap; }
+.comic-topbar .chip {
+  min-height: 48px;
+  padding: 6px 14px;
+  border: 3px solid var(--c-ink);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--c-ink);
+  font: 700 1rem/1 var(--c-display);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--c-ink);
+}
+.comic-topbar .chip.play { background: var(--c-accent); }
+.comic-topbar .chip:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--c-ink); }
+
+/* Stage: one page at a time. */
+.comic-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+.comic-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  margin: auto;
+}
+.comic-page.beside { flex-direction: row; align-items: center; gap: 16px; }
+.comic-page.from-right { animation: comic-in-r 0.28s ease-out; }
+.comic-page.from-left { animation: comic-in-l 0.28s ease-out; }
+@keyframes comic-in-r { from { transform: translateX(40px); opacity: 0; } }
+@keyframes comic-in-l { from { transform: translateX(-40px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .comic-page.from-right, .comic-page.from-left { animation: none; }
+}
+
+.comic-frame {
+  position: relative;
+  flex: 0 0 auto;
+  border: 4px solid var(--c-ink);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 6px 6px 0 rgba(59, 42, 30, 0.85);
+  container-type: inline-size;
+  box-sizing: border-box;
+  line-height: 0;
+}
+.comic-img {
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Words: a yellow narration caption and white speech bubbles. */
+.comic-talk { line-height: 1.3; box-sizing: border-box; }
+.comic-caption {
+  background: var(--c-caption);
+  border: 3px solid var(--c-ink);
+  padding: 8px 12px;
+  font: 700 1.15rem/1.3 var(--c-display);
+  box-shadow: 3px 3px 0 rgba(59, 42, 30, 0.6);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.comic-bubbles { display: flex; flex-wrap: wrap; gap: 14px 12px; align-items: flex-start; }
+.comic-bubble {
+  --tail: 32px;
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--c-ink);
+  border-radius: 22px;
+  padding: 8px 14px 10px;
+  font: 1.15rem/1.3 var(--c-display);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  box-sizing: border-box;
+}
+.comic-who {
+  display: block;
+  font: 700 0.75em/1.2 system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  margin-bottom: 2px;
+}
+.comic-text { display: block; }
+.comic-bubble.role-villain { border-width: 4px; border-radius: 10px; background: #fff3ef; }
+.comic-bubble.shout .comic-text { font-weight: 900; font-size: 1.3em; letter-spacing: 0.03em; }
+/* Tail (two stacked triangles: ink outline + white fill). */
+.comic-bubble::before, .comic-bubble::after {
+  content: "";
+  position: absolute;
+  left: var(--tail);
+  width: 0;
+  height: 0;
+  border-style: solid;
+  transform: translateX(-50%);
+}
+.comic-bubble.no-tail::before, .comic-bubble.no-tail::after { display: none; }
+.comic-bubble.speaking, .comic-caption.speaking, .comic-cover-head.speaking {
+  outline: 5px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* Overlay: words float in the empty sky at the top of a drawn scene. */
+.comic-page.overlay .comic-talk {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  font-size: clamp(14px, 2.1cqi, 26px);
+}
+.comic-page.overlay .comic-caption { position: absolute; top: 0; left: 0; max-width: 38cqi; font-size: 1em; padding: 0.4em 0.6em; border-top: 0; border-left: 0; }
+.comic-page.overlay .comic-bubble { position: absolute; width: max-content; max-width: 44cqi; font-size: 1em; }
+.comic-page.overlay .comic-bubble::before { bottom: -16px; border-width: 16px 9px 0; border-color: var(--c-ink) transparent transparent; }
+.comic-page.overlay .comic-bubble::after { bottom: -10px; border-width: 11px 6px 0; border-color: #fff transparent transparent; }
+.comic-page.overlay .comic-bubble.role-villain::after { border-top-color: #fff3ef; }
+
+/* Below / beside: words outside the picture so nothing hides the child's drawing. */
+.comic-page.below .comic-talk { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 14px; }
+.comic-page.beside .comic-talk { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; padding: 14px 6px 6px; }
+.comic-page.below .comic-bubbles, .comic-page.beside .comic-bubbles { flex-direction: column; align-items: stretch; padding-top: 8px; }
+.comic-page.below .comic-bubble::before, .comic-page.beside .comic-bubble::before { top: -15px; border-width: 0 9px 15px; border-color: transparent transparent var(--c-ink); }
+.comic-page.below .comic-bubble::after, .comic-page.beside .comic-bubble::after { top: -9px; border-width: 0 6px 10px; border-color: transparent transparent #fff; }
+.comic-page.below .comic-bubble.role-villain::after, .comic-page.beside .comic-bubble.role-villain::after { border-bottom-color: #fff3ef; }
+@media (orientation: portrait) {
+  .comic-page.below .comic-bubble, .comic-page.below .comic-caption { font-size: 1.35rem; }
+}
+
+/* Cover and end pages. */
+.comic-cover-head { text-align: center; padding: 4px 10px; border-radius: 12px; }
+.comic-title {
+  margin: 0;
+  font: 900 clamp(1.8rem, 5vw, 3.2rem)/1.1 var(--c-display);
+  overflow-wrap: anywhere;
+  text-shadow: 3px 3px 0 var(--c-caption);
+}
+.comic-by { margin: 6px 0 0; font: 700 1.25rem/1.2 var(--c-display); overflow-wrap: anywhere; }
+.comic-end { text-align: center; gap: 18px; }
+.comic-stars { font-size: 2.6rem; margin: 0; }
+.comic-end-actions { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+.comic-big {
+  min-height: 72px;
+  padding: 10px 26px;
+  border: 4px solid var(--c-ink);
+  border-radius: 20px;
+  background: var(--c-accent);
+  color: var(--c-ink);
+  font: 800 1.4rem/1 var(--c-display);
+  box-shadow: 0 5px 0 var(--c-ink);
+  cursor: pointer;
+}
+.comic-big.ghost { background: #fff; }
+
+/* Footer: page turn, read-aloud, dots. */
+.comic-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 10px;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+.comic-turn {
+  flex: 0 0 auto;
+  width: 76px;
+  height: 68px;
+  border: 4px solid var(--c-ink);
+  border-radius: 20px;
+  background: var(--c-accent);
+  color: var(--c-ink);
+  font-size: 1.9rem;
+  line-height: 1;
+  box-shadow: 0 5px 0 var(--c-ink);
+  cursor: pointer;
+}
+.comic-turn:disabled { opacity: 0.35; cursor: default; }
+.comic-turn:not(:disabled):active, .comic-big:active, .comic-read:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--c-ink); }
+.comic-mid { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.comic-read {
+  min-height: 64px;
+  padding: 6px 22px;
+  border: 4px solid var(--c-ink);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--c-ink);
+  font: 800 1.2rem/1 var(--c-display);
+  box-shadow: 0 4px 0 var(--c-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.comic-dotrow { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+.comic-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; min-width: 0; }
+.comic-dot {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid var(--c-ink);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.comic-dot.on { background: var(--c-ink); }
+.comic-count { font: 700 0.95rem/1 var(--c-display); white-space: nowrap; }
+.comic button:focus-visible { outline: 4px solid #3d7fd6; outline-offset: 2px; }
+
+/* Small or upright phones: compact chrome so the picture gets the room. */
+@media (max-width: 600px) {
+  .comic-topbar { padding: 6px 8px; gap: 6px; }
+  .comic-topbar .topbar-title { font-size: 1.05rem; }
+  .comic-topbar .chip { padding: 6px 10px; font-size: 0.9rem; }
+  .comic-stage { padding: 8px 16px; }
+  .comic-dots { display: none; }
+  .comic-turn { width: 68px; }
+}
+@media (max-width: 420px) {
+  .comic-topbar .topbar-title { display: none; }
+  .comic-topbar .topbar-actions { flex: 1 1 auto; justify-content: flex-end; }
+}
+/* Short sideways phones. */
+@media (max-height: 480px) {
+  .comic-topbar { min-height: 0; padding: 4px 12px; }
+  .comic-topbar .chip { min-height: 40px; padding: 4px 12px; }
+  .comic-foot { padding: 4px 12px 6px; }
+  .comic-turn { height: 52px; }
+  .comic-read { min-height: 48px; }
+  .comic-dots { display: none; }
+  .comic-mid { flex-direction: row; justify-content: center; }
+  .comic-stage { padding: 4px 16px; }
+  .comic-page.beside .comic-bubble, .comic-page.beside .comic-caption { font-size: 1rem; }
+}

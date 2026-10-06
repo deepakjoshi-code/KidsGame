@@ -55,9 +55,10 @@ export function parseChunk(chunk) {
     if (colon) { lines.push({ name: colon[1], text: stripQuotes(colon[2]) }); continue; }
     let s = raw;
     const after = new RegExp(`"([^"]+)"\\s*,?\\s*(?:${SAY})\\s+(?:the\\s+)?([A-Z]?[\\p{L}-]+)`, "giu");
-    const before = new RegExp(`([A-Z][\\p{L}-]+)\\s+(?:${SAY})\\s*,?\\s*"([^"]+)"`, "gu");
-    s = s.replace(after, (_, q, n) => { lines.push({ name: cap(n), text: q.trim() }); return " "; });
-    s = s.replace(before, (_, n, q) => { lines.push({ name: cap(n), text: q.trim() }); return " "; });
+    // "Pip said" / "The lion said" / "she said" before the quote.
+    const before = new RegExp(`(?:\\b[Tt]he\\s+)?\\b([\\p{L}][\\p{L}-]*)\\s+(?:${SAY})\\s*,?\\s*:?\\s*"([^"]+)"`, "gu");
+    s = s.replace(after, (_, q, n) => { lines.push({ name: speaker(n), text: q.trim() }); return " "; });
+    s = s.replace(before, (_, n, q) => { lines.push({ name: speaker(n), text: q.trim() }); return " "; });
     // A lone quote with no speaker belongs to whoever spoke last (or the hero later).
     s = s.replace(/"([^"]{2,})"/g, (_, q) => { lines.push({ name: null, text: q.trim() }); return " "; });
     s = s.replace(/\s+/g, " ").trim();
@@ -66,6 +67,9 @@ export function parseChunk(chunk) {
   return { narration: rest.join(" "), lines };
 }
 
+// Pronouns aren't characters: "she said" belongs to whoever spoke last.
+const PRONOUNS = new Set(["he", "she", "it", "they", "we", "i", "you", "everyone", "someone"]);
+const speaker = (n) => (PRONOUNS.has(n.toLowerCase()) ? null : cap(n));
 function stripQuotes(s) { return s.trim().replace(/^"(.*)"$/, "$1").trim(); }
 function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
@@ -80,11 +84,13 @@ function resolveSpeaker(name, text) {
   const direct = matchCatalog(name);
   if (direct) return direct;
   const nm = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pats = [
-    new RegExp(`${nm},?\\s+(?:the|a|an)\\s+(?:\\p{L}+\\s+)?([\\p{L}-]+)`, "iu"),
-    new RegExp(`(?:a|an|the)\\s+(?:\\p{L}+\\s+)?([\\p{L}-]+)\\s+(?:named|called)\\s+${nm}`, "iu"),
-    new RegExp(`${nm}\\s+(?:was|is)\\s+(?:a|an)\\s+(?:\\p{L}+\\s+)?([\\p{L}-]+)`, "iu"),
-  ];
+  // Each pattern is tried without and then with one describing word ("Pip the bunny", "Pip the little bunny").
+  const adj = ["", "(?:\\p{L}+\\s+)"];
+  const pats = adj.flatMap((A) => [
+    new RegExp(`${nm},?\\s+(?:the|a|an)\\s+${A}([\\p{L}-]+)`, "iu"),
+    new RegExp(`(?:a|an|the)\\s+${A}([\\p{L}-]+)\\s+(?:named|called)\\s+${nm}`, "iu"),
+    new RegExp(`${nm}\\s+(?:was|is)\\s+(?:a|an)\\s+${A}([\\p{L}-]+)`, "iu"),
+  ]);
   for (const re of pats) {
     const m = text.match(re);
     if (m) { const c = matchCatalog(m[1]); if (c) return c; }
@@ -140,14 +146,25 @@ export function buildBook(text, { title = "My Story", author = "" } = {}) {
     if (existing) { byName.set(lower, existing); continue; }
     add(l.name, cat);
   }
+  // 1b. Named characters introduced in narration ("Pip the bunny", "a dog named Max"), even if they never speak.
+  const NOT_NAMES = new Set(["then", "when", "and", "but", "so", "suddenly", "after", "finally", "one", "once", "there", "here", "now", "soon", "later", "next", "meanwhile", "today", "the", "a", "an", "oh", "look", "all", "every", "it", "he", "she", "they", "we", "i", "you"]);
+  const named = [...all.matchAll(/\b([A-Z][\p{L}'-]+),?\s+(?:the|a|an|was|is)\s/gu), ...all.matchAll(/(?:named|called)\s+([A-Z][\p{L}'-]+)/gu)];
+  for (const m of named) {
+    const name = m[1];
+    if (NOT_NAMES.has(name.toLowerCase()) || byName.has(name.toLowerCase()) || matchCatalog(name)) continue;
+    const cat = resolveSpeaker(name, all);
+    if (cat) add(name, cat);
+  }
   // 2. Characters only mentioned in narration ("a velociraptor", "his pet lion").
   for (const c of CAST) {
     if (cast.some((m) => m.kind === c.key)) continue;
     if (countWords(all, c.words) > 0) add(c.label, c);
   }
   if (!cast.length) add("Hero", null);
-  // 3. Roles: the first non-villain is the hero.
-  const hero = cast.find((c) => c.role !== "villain") || cast[0];
+  // 3. Roles: the hero is the first non-villain the story mentions.
+  const lowerAll = all.toLowerCase();
+  const firstSeen = (c) => Math.min(...[c.name, ...c.words].map((w) => { const i = lowerAll.indexOf(w.toLowerCase()); return i < 0 ? Infinity : i; }));
+  const hero = cast.filter((c) => c.role !== "villain").sort((a, b) => firstSeen(a) - firstSeen(b))[0] || cast[0];
   hero.role = "hero";
 
   // 4. Pages.
@@ -185,6 +202,7 @@ export function buildBook(text, { title = "My Story", author = "" } = {}) {
 
 // A game plan: story cards with levels slotted in where the story has action.
 export function planGame(book) {
+  if (!book.pages || !book.pages.length) return [];
   const steps = [];
   let levels = 0, last = null, lastAt = -9;
   book.pages.forEach((p, i) => {
@@ -195,7 +213,8 @@ export function planGame(book) {
     steps.push({ type: "level", kind: a, page: i });
     levels++; last = a; lastAt = i;
   });
-  if (levels === 0) {
+  // Always at least one real game besides the closing fireworks.
+  if (!steps.some((s) => s.type === "level" && s.kind !== "celebrate")) {
     steps.splice(Math.min(1, steps.length), 0, { type: "level", kind: "journey", page: 0 });
     levels++;
   }

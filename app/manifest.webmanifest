@@ -1,0 +1,21 @@
+{
+  "name": "Wish Circle",
+  "short_name": "Wish Circle",
+  "description": "Turn your own story book into comic pages and a game. Private: everything stays on this device.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fbf4e2",
+  "theme_color": "#fbf4e2",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["kids", "education", "books"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

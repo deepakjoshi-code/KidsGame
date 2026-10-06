@@ -60,6 +60,15 @@ export async function setup(passcode) {
 
 // Throttle wrong guesses: after 5 misses, wait 30s, 60s, 120s… up to 1 hour.
 async function throttle() { return (await idbGet("meta", "throttle")) || { id: "throttle", fails: 0, until: 0 }; }
+async function recordFail() {
+  const t = await throttle();
+  t.fails++;
+  if (t.fails >= MAX_FAILS_FREE) t.until = Date.now() + Math.min(3600, 30 * 2 ** (t.fails - MAX_FAILS_FREE)) * 1000;
+  await idbPut("meta", t);
+  return t.fails;
+}
+const clearFails = () => idbPut("meta", { id: "throttle", fails: 0, until: 0 });
+export const FREE_TRIES = MAX_FAILS_FREE;
 export async function lockoutRemaining() {
   const t = await throttle();
   return Math.max(0, Math.ceil((t.until - Date.now()) / 1000));
@@ -71,13 +80,10 @@ export async function unlock(passcode) {
   const meta = await idbGet("meta", "vault");
   const k = await C.openVault(meta, passcode);
   if (!k) {
-    const t = await throttle();
-    t.fails++;
-    if (t.fails >= MAX_FAILS_FREE) t.until = Date.now() + Math.min(3600, 30 * 2 ** (t.fails - MAX_FAILS_FREE)) * 1000;
-    await idbPut("meta", t);
-    return { ok: false, wait: await lockoutRemaining(), fails: t.fails };
+    const fails = await recordFail();
+    return { ok: false, wait: await lockoutRemaining(), fails };
   }
-  await idbPut("meta", { id: "throttle", fails: 0, until: 0 });
+  await clearFails();
   key = k;
   await loadAll();
   requestPersistence();
@@ -89,11 +95,8 @@ export async function verify(passcode) {
   if ((await lockoutRemaining()) > 0) return false;
   const meta = await idbGet("meta", "vault");
   const ok = !!(await C.openVault(meta, passcode));
-  if (!ok) {
-    const t = await throttle(); t.fails++;
-    if (t.fails >= MAX_FAILS_FREE) t.until = Date.now() + Math.min(3600, 30 * 2 ** (t.fails - MAX_FAILS_FREE)) * 1000;
-    await idbPut("meta", t);
-  } else await idbPut("meta", { id: "throttle", fails: 0, until: 0 });
+  if (!ok) await recordFail();
+  else await clearFails();
   return ok;
 }
 
@@ -174,9 +177,12 @@ export async function deleteImage(id) {
 export async function changePasscode(oldPass, newPass) {
   const problem = C.passcodeProblem(newPass);
   if (problem) return problem;
+  const wait = await lockoutRemaining();
+  if (wait > 0) return `Too many wrong tries. Wait ${wait} seconds.`;
   const meta = await idbGet("meta", "vault");
   const next = await C.rewrapVault(meta, oldPass, newPass);
-  if (!next) return "The current passcode is wrong.";
+  if (!next) { await recordFail(); return "The current passcode is wrong."; }
+  await clearFails();
   await idbPut("meta", { id: "vault", ...next });
   return null;
 }
@@ -200,6 +206,8 @@ export async function importBackup(text, passcode) {
   try { data = JSON.parse(text); } catch { return "That file isn't a Wish Circle backup."; }
   if (data?.format !== "wishcircle-backup" || data.v !== 1 || !Array.isArray(data.records) || !Array.isArray(data.images)) return "That file isn't a Wish Circle backup.";
   const meta = { v: 1, kdf: data.vault?.kdf, iterations: data.vault?.iterations, salt: data.vault?.salt, iv: data.vault?.iv, wrapped: data.vault?.wrapped };
+  // A hostile file could ask for billions of rounds and freeze the app.
+  if (meta.kdf !== "PBKDF2-SHA-256" || !(meta.iterations >= 100_000 && meta.iterations <= 10_000_000)) return "That file isn't a Wish Circle backup.";
   let k;
   try { k = await C.openVault(meta, passcode); } catch { k = null; }
   if (!k) return "That passcode doesn't open this backup.";

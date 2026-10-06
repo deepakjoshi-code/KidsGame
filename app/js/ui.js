@@ -59,60 +59,98 @@ export function toast(msg) {
   toastTimer = setTimeout(() => (t.hidden = true), 2600);
 }
 
-// In-page dialog (no alert/confirm). Resolves with the value of the clicked choice.
+// Modal layer shared by dialog/askPasscode: Escape closes, Tab stays inside, focus returns after.
+export function modal(content, onCancel) {
+  const before = document.activeElement;
+  const wrap = h("div", { class: "modal-wrap", onclick: (e) => { if (e.target === wrap) onCancel?.(); } }, content);
+  wrap.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); onCancel?.(); return; }
+    if (e.key !== "Tab") return;
+    const f = [...wrap.querySelectorAll("button,input,select,textarea,[tabindex]")].filter((x) => !x.disabled && x.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  document.body.appendChild(wrap);
+  return { wrap, close() { wrap.remove(); if (before && before.isConnected) before.focus?.(); } };
+}
+export function closeModals() { document.querySelectorAll(".modal-wrap").forEach((m) => m.remove()); }
+
+// In-page dialog (no alert/confirm). Resolves with the value of the clicked choice (null on Escape).
 export function dialog({ title, body, choices }) {
   return new Promise((resolve) => {
-    const close = (v) => { wrap.remove(); resolve(v); };
-    const wrap = h("div", { class: "modal-wrap", onclick: (e) => { if (e.target === wrap) close(null); } },
+    let m;
+    const close = (v) => { m.close(); resolve(v); };
+    m = modal(
       h("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-label": title },
         h("h2", null, title),
         body ? (body instanceof Node ? body : h("p", null, body)) : null,
         h("div", { class: "row end" }, choices.map((c) => button(c.label, () => close(c.value), c.cls || ""))),
-      ));
-    document.body.appendChild(wrap);
-    wrap.querySelector(".btn:last-child")?.focus();
+      ), () => close(null));
+    m.wrap.querySelector(".btn:last-child")?.focus();
   });
 }
 export const confirmBox = (title, body, yes = "Yes", cls = "danger") =>
   dialog({ title, body, choices: [{ label: "Cancel", value: false, cls: "ghost" }, { label: yes, value: true, cls }] });
 
 // Ask for the parent passcode. Resolves with the passcode or null.
-export function askPasscode(title = "Grown-ups only", verify) {
+// verify(pass) → true | false | "message to show" (e.g. a lockout wait).
+export function askPasscode(title = "Grown-ups only", verify, prompt = "Enter the parent passcode.") {
   return new Promise((resolve) => {
     const input = h("input", { type: "password", autocomplete: "current-password", id: "gate-pass", "aria-label": "Parent passcode", class: "input" });
     const err = h("p", { class: "error", role: "alert" });
+    const go = h("button", { type: "submit", class: "btn" }, "Continue");
+    let m;
+    const finish = (v) => { m.close(); resolve(v); };
     const submit = async (e) => {
       e?.preventDefault();
+      if (go.disabled) return;
+      if (!input.value) { err.textContent = "Type the passcode first."; input.focus(); return; }
+      go.disabled = true;
       err.textContent = "Checking…";
-      const ok = await verify(input.value);
-      if (ok) { wrap.remove(); resolve(input.value); }
-      else { err.textContent = "That's not the parent passcode."; input.value = ""; input.focus(); }
+      let ok;
+      try { ok = await verify(input.value); } catch { ok = false; }
+      go.disabled = false;
+      if (ok === true) finish(input.value);
+      else { err.textContent = typeof ok === "string" ? ok : "That's not the parent passcode."; input.value = ""; input.focus(); }
     };
-    const wrap = h("div", { class: "modal-wrap" },
-      h("form", { class: "modal", onsubmit: submit, role: "dialog", "aria-modal": "true" },
+    m = modal(
+      h("form", { class: "modal", onsubmit: submit, role: "dialog", "aria-modal": "true", "aria-label": title },
         h("h2", null, "🔒 " + title),
-        h("p", null, "Enter the parent passcode."),
+        h("p", null, prompt),
         input, err,
         h("div", { class: "row end" },
-          button("Cancel", () => { wrap.remove(); resolve(null); }, "ghost"),
-          h("button", { type: "submit", class: "btn" }, "Continue")),
-      ));
-    document.body.appendChild(wrap);
+          button("Cancel", () => finish(null), "ghost"),
+          go),
+      ), () => finish(null));
     setTimeout(() => input.focus(), 30);
   });
 }
 
-// Offer a file to the user (backup, shared book).
-export function saveFile(name, text, type = "application/json") {
+// Offer a file to the user (backup, shared book). In an installed iPhone/iPad app a plain
+// download has nowhere to go, so the share sheet ("Save to Files") is used there when possible.
+export async function saveFile(name, text, type = "application/json") {
+  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (standalone && navigator.canShare) {
+    try {
+      const file = new File([text], name, { type });
+      if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return true; }
+    } catch (e) { if (e?.name === "AbortError") return false; }
+  }
   const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = h("a", { href: url, download: name });
+  const a = h("a", { href: url, download: name, hidden: true });
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return true;
 }
+// Resolves with the chosen files ([] if the picker is cancelled).
 export function pickFile(accept, multiple = false) {
   return new Promise((resolve) => {
-    const input = h("input", { type: "file", accept, multiple, style: { display: "none" } });
-    input.addEventListener("change", () => { resolve([...input.files]); input.remove(); });
+    const input = h("input", { type: "file", accept, multiple, hidden: true });
+    const done = (files) => { resolve(files); input.remove(); };
+    input.addEventListener("change", () => done([...input.files]));
+    input.addEventListener("cancel", () => done([]));
     document.body.appendChild(input);
     input.click();
   });

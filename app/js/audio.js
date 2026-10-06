@@ -1,6 +1,19 @@
 // Sound effects (synthesised, no files) and read-aloud with the device's own voices.
 
-export const settings = { sound: true, read: true };
+// Sound and read-aloud switches. They are non-identifying UI preferences, so (as the contract
+// allows) they persist in localStorage under "wc.sound" / "wc.read".
+const PREF_KEYS = { sound: "wc.sound", read: "wc.read" };
+function loadPref(k) {
+  try { const v = localStorage.getItem(PREF_KEYS[k]); if (v === "0") return false; } catch { /* storage blocked */ }
+  return true;
+}
+export const settings = { sound: loadPref("sound"), read: loadPref("read") };
+export function setSetting(k, on) {
+  if (!(k in PREF_KEYS)) return;
+  settings[k] = !!on;
+  try { localStorage.setItem(PREF_KEYS[k], on ? "1" : "0"); } catch { /* storage blocked */ }
+  if (k === "read" && !on) stopSpeech();
+}
 let ac = null;
 export function audio() {
   if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
@@ -53,6 +66,12 @@ export const sfx = {
   fanfare() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i === 3 ? 0.5 : 0.16, "square", 0.08, null, i * 0.14)); },
   note(i) { const sc = [262, 294, 330, 349, 392, 440, 494, 523, 587, 659, 698, 784]; tone(sc[i % sc.length], 0.2, "triangle", 0.18); },
   click() { tone(660, 0.05, "square", 0.05); },
+  bigboom() { noise(2.2, 1, 900); tone(70, 1.6, "sine", 0.7, 25); noise(1.2, 0.5, 300, 0.3); },
+  siren() { for (let i = 0; i < 3; i++) { tone(950, 0.3, "triangle", 0.12, null, i * 0.6); tone(700, 0.3, "triangle", 0.12, null, i * 0.6 + 0.3); } },
+  whistle() { tone(500, 0.7, "sine", 0.08, 1800); noise(0.6, 0.08, 3000); },
+  crackle() { noise(0.9, 0.5, 1800); for (let i = 0; i < 6; i++) noise(0.05, 0.25, 6000, 0.25 + i * 0.09); },
+  boing() { tone(180, 0.35, "sine", 0.25, 520); },
+  cheer() { [523, 659, 784].forEach((f, i) => tone(f, 0.22, "triangle", 0.12, f * 1.5, i * 0.09)); },
 };
 
 const VOICES = { hero: { pitch: 1.5, rate: 0.95 }, friend: { pitch: 1.2, rate: 0.95 }, villain: { pitch: 0.3, rate: 0.75 }, narrator: { pitch: 1, rate: 0.9 } };
@@ -79,6 +98,33 @@ export function speak(lines, onLine) {
     u.onstart = start;
     speechSynthesis.speak(u);
   });
+}
+// Speak one line and call done() when it has been read: when the voice finishes, or after a
+// reading-time guess when read-aloud is off or no voice is available. Returns a cancel function.
+export function talk(line, done) {
+  stopSpeech();
+  const my = ++token;
+  const text = String(line?.text || "");
+  const guess = 900 + text.length * 60;
+  const t0 = Date.now();
+  let over = false, timer = 0;
+  const fin = () => { if (over) return; over = true; clearTimeout(timer); if (my === token) done?.(); };
+  const voiceOn = settings.read && typeof window !== "undefined" && "speechSynthesis" in window;
+  timer = setTimeout(fin, voiceOn ? guess * 2.5 + 2500 : guess);
+  if (voiceOn) {
+    try {
+      const u = new SpeechSynthesisUtterance(text.replace(/([!?])\1+/g, "$1"));
+      const v = VOICES[line.role] || VOICES.narrator;
+      u.pitch = v.pitch; u.rate = v.rate; if (voice) u.voice = voice;
+      // Leave the words up for a moment even if a voice ends (or fails) suspiciously fast.
+      const after = (share) => () => { if (over) return; clearTimeout(timer); timer = setTimeout(fin, Math.max(0, guess * share - (Date.now() - t0))); };
+      u.onend = after(0.5);
+      // No voice (or interrupted): fall back to reading time so the story keeps going.
+      u.onerror = after(1);
+      speechSynthesis.speak(u);
+    } catch { /* keep the reading-time timer */ }
+  }
+  return () => { over = true; clearTimeout(timer); };
 }
 export const say = (text) => speak([{ role: "narrator", text }]);
 document.addEventListener("visibilitychange", () => { if (document.hidden) stopSpeech(); });
