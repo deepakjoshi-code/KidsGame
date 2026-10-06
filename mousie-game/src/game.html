@@ -61,21 +61,6 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   position: absolute; inset: 0; background: var(--paper);
   display: flex; align-items: center; justify-content: center; gap: 24px; padding: 20px;
 }
-/* Story pages */
-#story { flex-wrap: wrap; align-content: center; }
-#story img {
-  max-height: 100%; max-width: min(62%, 100%); object-fit: contain;
-  border: 4px solid var(--ink); border-radius: 10px; background: #fff;
-  box-shadow: 6px 6px 0 rgba(59, 42, 30, .25);
-}
-.bubbles { display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 220px; max-width: 420px; }
-.bubble {
-  background: #fff; border: 3px solid var(--ink); border-radius: 22px;
-  padding: 12px 18px; font-size: clamp(1.1rem, 2.4vw, 1.7rem); line-height: 1.3;
-  transition: transform .2s, background .2s;
-}
-.bubble b { display: block; font-size: .7em; letter-spacing: .06em; text-transform: uppercase; color: var(--sky); }
-.bubble.now { background: #fff6c9; transform: scale(1.04); }
 /* Title & ending */
 #title, #end { flex-direction: column; text-align: center; gap: 14px; }
 #title img, #end img { max-height: 46%; border: 4px solid var(--ink); border-radius: 12px; }
@@ -112,14 +97,35 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 @keyframes pulse { 50% { transform: scale(1.07); } }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } .bubble { transition: none; } }
 @media (max-width: 640px) {
-  #story img { max-width: 100%; max-height: 55%; }
   .act { min-width: 130px; padding: 12px 18px; }
   .chip .lbl, #chapter { display: none; }
   header { justify-content: space-between; }
 }
 @media (hover: none) { .act kbd { display: none; } }
-#turn { display: none; text-align: center; font-size: .95rem; margin: 0; }
-@media (orientation: portrait) and (max-width: 600px) { #turn { display: block; } }
+/* Speech caption: only shown when the phone is upright (see below) */
+#caption { display: none; }
+#caption b { display: block; font-size: .62em; letter-spacing: .08em; text-transform: uppercase; color: var(--sky); }
+#caption.quiet { color: #8a7a6a; font-size: 1.05rem; text-align: center; }
+/* Phone held upright: wide picture on top, big speech caption, big buttons */
+@media (orientation: portrait) and (max-width: 600px) {
+  #app { gap: 10px; }
+  .logo { font-size: 1.35rem; }
+  .chip { padding: 5px 12px; }
+  #stage { flex: none; aspect-ratio: 4 / 3; max-height: 48vh; border-width: 3px; border-radius: 14px; }
+  #stage canvas { object-fit: cover; }
+  #stage:has(> .overlay:not([hidden])) { flex: 1; aspect-ratio: auto; }
+  #help { display: none !important; }
+  #caption {
+    display: flex; flex-direction: column; justify-content: center; position: relative;
+    flex: 1; min-height: 0; overflow-y: auto;
+    background: #fff; border: 3px solid var(--ink); border-radius: 20px;
+    padding: 12px 18px; font-size: clamp(1.3rem, 6vw, 1.8rem); line-height: 1.3; font-weight: 700;
+  }
+  #app:has(.overlay:not([hidden])) #caption { display: none; }
+  #controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; padding-bottom: 6px; }
+  #controls > .act:only-child, #controls > .act:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .act { min-width: 0; padding: 16px 8px; font-size: clamp(1.4rem, 6.5vw, 1.9rem); border-radius: 20px; }
+}
 /* Phone held sideways: picture on the left, big buttons on the right */
 @media (orientation: landscape) and (max-height: 520px) {
   #app { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding-block: max(6px, env(safe-area-inset-top, 0px)) max(6px, env(safe-area-inset-bottom, 0px)); }
@@ -130,7 +136,8 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   #stage { border-width: 3px; border-radius: 12px; }
   #controls { display: grid; grid-auto-rows: min-content; align-content: center; gap: 12px; min-height: 0; overflow-y: auto; padding-bottom: 6px; }
   #controls:has(> :nth-child(4)) { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .act { min-width: 120px; padding: 10px 14px; font-size: 1.25rem; border-width: 3px; border-radius: 16px; box-shadow: 0 5px 0 var(--ink); }
+  .act { min-width: 0; width: clamp(104px, 17vw, 168px); padding: 10px 8px; font-size: clamp(1rem, 2.6vw, 1.3rem); border-width: 3px; border-radius: 16px; box-shadow: 0 5px 0 var(--ink); }
+  .act .icon { display: block; margin: 0 0 2px; }
   .act:active, .act.pressed { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
   #story { flex-wrap: nowrap; gap: 12px; padding: 10px; }
   #story img { max-width: 58%; border-width: 3px; }
@@ -140,7 +147,7 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   #title img, #end img { max-height: 45%; }
   .big-title { font-size: 2.2rem; }
   .credit { font-size: .85rem; }
-  #help { font-size: .85rem; padding: 4px 12px; top: 6px; border-width: 2px; }
+  #help { font-size: .78rem; padding: 3px 12px; top: 4px; border-width: 2px; max-width: 80%; }
 }
 </style>
 </head>
@@ -160,7 +167,6 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
       <img src="__ART_cover__" alt="Mousie walking on a green path">
       <h1 class="big-title">Mousie</h1>
       <p class="credit">The Adventure Game · Story &amp; pictures by <strong>Samar</strong></p>
-      <p id="turn">📱↻ Turn your phone sideways for a bigger picture</p>
     </div>
     <div id="end" class="overlay" hidden>
       <img src="__ART_treehouse__" alt="Mousie climbing to the treehouse">
@@ -169,6 +175,7 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
       <p class="credit">Story &amp; pictures by <strong>Samar</strong> · Part 1</p>
     </div>
   </main>
+  <div id="caption" aria-live="polite"><b id="capWho"></b><span id="capText"></span></div>
   <nav id="controls"></nav>
 </div>
 
@@ -367,12 +374,14 @@ function playScene(id) {
   parts = []; texts = []; shake = 0;
   cut = { id, def: SCENES[id], t: 0, scroll: 0, scrollSpeed: 0, actors: {}, beat: -1, beatT: 0, talking: false, bubble: null, fade: 1, fadeTo: 0, ending: false, skipAt: 0 };
   cut.def.setup(cut);
+  setCaption("", "");
   setControls([{ icon: "⏩", label: "Skip", color: "gray", keys: [" ", "Enter", "ArrowRight"], keyName: "space", fn: skipBeat }]);
   nextBeat();
 }
 function nextBeat() {
   const c = cut;
   c.beat++; c.beatT = 0; c.bubble = null; c.talking = false;
+  if (c.def.beats[c.beat]?.say) { const [w, t] = c.def.beats[c.beat].say; setCaption(w, t); }
   const b = c.def.beats[c.beat];
   if (!b) { c.ending = true; c.fadeTo = 1; return; }
   if (b.do) b.do(c);
@@ -439,9 +448,17 @@ function drawCut() {
   }
   if (c.def.front) c.def.front(c);
   drawFx();
-  if (c.bubble) drawBubble(c);
+  if (c.bubble) (uprightPhone.matches ? drawTalkMarker(c) : drawBubble(c));
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, 24); ctx.fillRect(0, H - 24, W, 24);
   if (c.fade > 0.01) { ctx.fillStyle = `rgba(0,0,0,${Math.min(1, c.fade)})`; ctx.fillRect(0, 0, W, H); }
+}
+// Upright phones put the words in the caption below; on the picture a bouncing arrow shows who's talking.
+function drawTalkMarker(c) {
+  const a = c.actors[whoKey(c.bubble.who)];
+  if (!a || !a.visible) return;
+  const x = Math.max(160, Math.min(W - 160, a.x)), y = Math.max(70, a.y + a.jy - a.head * a.s - 30 - Math.abs(Math.sin(c.t * 6)) * 14);
+  ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.fillStyle = "#ffd75e";
+  ctx.beginPath(); ctx.moveTo(x - 30, y - 40); ctx.lineTo(x + 30, y - 40); ctx.lineTo(x, y); ctx.closePath(); ctx.fill(); ctx.stroke();
 }
 const BUBBLE_FONT = 'bold 26px "Chalkboard SE", "Comic Sans MS", cursive';
 function wrapText(text, maxW) {
@@ -488,7 +505,16 @@ function showEnd() {
   say("The End! Great job! You helped Mousie get home.");
   setControls([{ icon: "🔁", label: "Play again", color: "green", pulse: true, tap: true, keys: NEXT_KEYS, keyName: "space", fn: goTitle }]);
 }
+// Upright phones show the current line under the picture in big text.
+function setCaption(who, text) {
+  const quiet = !text;
+  $("caption").classList.toggle("quiet", quiet);
+  $("capWho").textContent = quiet || who === "Narrator" ? "" : who;
+  $("capText").textContent = quiet ? "🎬 " + $("chapter").textContent : text;
+}
+const uprightPhone = matchMedia("(orientation: portrait) and (max-width: 600px)");
 function help(text) {
+  setCaption("", text);
   const h = $("help"); h.textContent = text; h.hidden = false;
   clearTimeout(help.timer); help.timer = setTimeout(() => (h.hidden = true), 7000);
   say(text);
@@ -498,6 +524,7 @@ function levelWon(msg) {
   scene.won = true; game.stars++;
   sfx.fanfare();
   addText(msg, W / 2, 170, "#f0a040", 72, 99);
+  setCaption("", msg + " ⭐");
   $("help").hidden = true;
   say(msg + " Press Next.");
   setTimeout(() => {
@@ -768,7 +795,7 @@ function drawHearts(x, y, hp, max, label) {
 }
 function drawCheeseCount() {
   ctx.font = 'bold 28px "Chalkboard SE", "Comic Sans MS", cursive'; ctx.textAlign = "left";
-  ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.strokeText(`🧀 ${game.cheese}`, 20, 48); ctx.fillStyle = "#ffd75e"; ctx.fillText(`🧀 ${game.cheese}`, 20, 48);
+  ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.strokeText(`🧀 ${game.cheese}`, 134, 92); ctx.fillStyle = "#ffd75e"; ctx.fillText(`🧀 ${game.cheese}`, 134, 92);
 }
 function drawCheese(x, y, s = 1) {
   begin(x, y, s, false);
@@ -889,7 +916,7 @@ const LEVELS = {
         poly([10, -7, 22, 0, 10, 7], "#c9c9c9"); poly([-30, 0, -38, -7, -26, 0, -38, 7], "#d8453b", false);
         ctx.restore();
       });
-      if (!s.dead) drawHearts(Math.min(s.rx, W - 130), GROUND + 60, s.hp, s.max, "Velociraptor");
+      if (!s.dead) drawHearts(Math.min(s.rx, W - 250), GROUND + 60, s.hp, s.max, "Velociraptor");
     },
   },
 
@@ -961,7 +988,7 @@ const LEVELS = {
         ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(b.x + 10, b.y - 18); ctx.lineTo(b.x + 18, b.y - 30); ctx.stroke();
         ell(b.x + 19, b.y - 32, 5, 5, Math.random() < 0.5 ? "#ffd75e" : "#f0a040", 0, false);
       });
-      if (!s.dead) drawHearts(Math.min(s.rx, W - 130), GROUND + 60, s.hp, s.max, "The Mighty T-Rex");
+      if (!s.dead) drawHearts(Math.min(s.rx, W - 250), GROUND + 60, s.hp, s.max, "The Mighty T-Rex");
     },
   },
 
@@ -1012,7 +1039,7 @@ const LEVELS = {
       ["lion", "truck", "snake", "bird"].forEach((k, i) => {
         ctx.font = "38px sans-serif"; ctx.textAlign = "center";
         ctx.globalAlpha = s.done.has(k) ? 1 : 0.3;
-        ctx.fillText("⭐", W - 200 + i * 48, 52);
+        ctx.fillText("⭐", W / 2 - 72 + i * 48, 92);
       });
       ctx.globalAlpha = 1;
     },
@@ -1033,7 +1060,7 @@ const LEVELS = {
       drawMouse(555, s.y, 0.9, { t: s.t, walk: Math.abs(s.ty - s.y) > 2 });
       drawBird(720, 230 + Math.sin(s.t * 2) * 12, 0.9, { t: s.t, flip: true });
       ctx.font = 'bold 30px "Chalkboard SE", "Comic Sans MS", cursive'; ctx.textAlign = "left"; ctx.lineWidth = 5; ctx.strokeStyle = INK;
-      const label = `Steps: ${s.rung} / ${s.total}`; ctx.strokeText(label, 24, 50); ctx.fillStyle = "#fff"; ctx.fillText(label, 24, 50);
+      const label = `Steps: ${s.rung} / ${s.total}`; ctx.strokeText(label, 134, 92); ctx.fillStyle = "#fff"; ctx.fillText(label, 134, 92);
     },
   },
 };
