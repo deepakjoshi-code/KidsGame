@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Mousie Adventure</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mousie">
+<meta name="theme-color" content="#fbf4e2">
+<link rel="apple-touch-icon" href="__ART_icon__">
 <style>
 /* Layout: one screen — header strip, picture-book stage, chunky button tray */
 :root {
@@ -28,8 +33,15 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
 }
-#app { height: 100%; display: flex; flex-direction: column; padding-inline: 16px; padding-block: 10px; gap: 10px; }
+#app { height: 100%; height: 100dvh; display: flex; flex-direction: column; gap: 10px;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+  padding-block: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
+img { -webkit-user-drag: none; pointer-events: none; }
 header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .logo { font-family: var(--display); font-size: 1.6rem; font-weight: 700; color: var(--sun); -webkit-text-stroke: 1px var(--ink); letter-spacing: .02em; }
 #chapter { flex: 1; min-width: 0; font-size: 1.1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -102,6 +114,33 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 @media (max-width: 640px) {
   #story img { max-width: 100%; max-height: 55%; }
   .act { min-width: 130px; padding: 12px 18px; }
+  .chip .lbl, #chapter { display: none; }
+  header { justify-content: space-between; }
+}
+@media (hover: none) { .act kbd { display: none; } }
+#turn { display: none; text-align: center; font-size: .95rem; margin: 0; }
+@media (orientation: portrait) and (max-width: 600px) { #turn { display: block; } }
+/* Phone held sideways: picture on the left, big buttons on the right */
+@media (orientation: landscape) and (max-height: 520px) {
+  #app { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding-block: max(6px, env(safe-area-inset-top, 0px)) max(6px, env(safe-area-inset-bottom, 0px)); }
+  header { grid-column: 1 / -1; gap: 8px; }
+  .logo { font-size: 1.2rem; }
+  #chapter { font-size: .9rem; }
+  .chip { font-size: .8rem; padding: 3px 10px; border-width: 2px; }
+  #stage { border-width: 3px; border-radius: 12px; }
+  #controls { display: grid; grid-auto-rows: min-content; align-content: center; gap: 12px; min-height: 0; overflow-y: auto; padding-bottom: 6px; }
+  #controls:has(> :nth-child(4)) { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .act { min-width: 120px; padding: 10px 14px; font-size: 1.25rem; border-width: 3px; border-radius: 16px; box-shadow: 0 5px 0 var(--ink); }
+  .act:active, .act.pressed { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  #story { flex-wrap: nowrap; gap: 12px; padding: 10px; }
+  #story img { max-width: 58%; border-width: 3px; }
+  .bubbles { min-width: 0; max-height: 100%; overflow-y: auto; gap: 8px; }
+  .bubble { font-size: 1rem; padding: 6px 12px; border-radius: 14px; }
+  #title, #end { gap: 6px; padding: 8px; }
+  #title img, #end img { max-height: 45%; }
+  .big-title { font-size: 2.2rem; }
+  .credit { font-size: .85rem; }
+  #help { font-size: .85rem; padding: 4px 12px; top: 6px; border-width: 2px; }
 }
 </style>
 </head>
@@ -110,9 +149,9 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   <header>
     <span class="logo">Mousie</span>
     <span id="chapter">The Adventure Game</span>
-    <button class="chip" id="tSound" aria-pressed="true" type="button">🔊 Sounds</button>
-    <button class="chip" id="tRead" aria-pressed="true" type="button">🗣️ Read to me</button>
-    <button class="chip" id="tHome" type="button">🏠 Start over</button>
+    <button class="chip" id="tSound" aria-pressed="true" type="button">🔊<span class="lbl"> Sounds</span></button>
+    <button class="chip" id="tRead" aria-pressed="true" type="button">🗣️<span class="lbl"> Read to me</span></button>
+    <button class="chip" id="tHome" type="button">🏠<span class="lbl"> Start over</span></button>
   </header>
   <main id="stage">
     <canvas id="cv" width="960" height="540"></canvas>
@@ -125,6 +164,7 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
       <img src="__ART_cover__" alt="Mousie walking on a green path">
       <h1 class="big-title">Mousie</h1>
       <p class="credit">The Adventure Game · Story &amp; pictures by <strong>Samar</strong></p>
+      <p id="turn">📱↻ Turn your phone sideways for a bigger picture</p>
     </div>
     <div id="end" class="overlay" hidden>
       <img src="__ART_treehouse__" alt="Mousie climbing to the treehouse">
@@ -184,6 +224,14 @@ function noise(dur, vol = 0.3, freq = 1000, delay = 0) {
   const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   s.connect(f).connect(g).connect(a.destination); s.start(t);
 }
+// iPhone only allows sound after a tap: play a silent blip on the first touch
+function unlockAudio() {
+  const a = audio();
+  if (a) { const b = a.createBuffer(1, 1, 22050), src = a.createBufferSource(); src.buffer = b; src.connect(a.destination); src.start(0); }
+  ["touchend", "click", "keydown"].forEach((ev) => document.removeEventListener(ev, unlockAudio, true));
+}
+["touchend", "click", "keydown"].forEach((ev) => document.addEventListener(ev, unlockAudio, true));
+document.addEventListener("visibilitychange", () => { if (document.hidden) stopSpeech(); else if (ac) ac.resume(); });
 const sfx = {
   jump() { tone(380, 0.18, "square", 0.08, 760); },
   cheese() { tone(880, 0.08, "square", 0.07); tone(1320, 0.14, "square", 0.07, null, 0.08); },
@@ -275,7 +323,8 @@ function setControls(list) {
     el.type = "button";
     el.className = "act " + (b.color || "") + (b.pulse ? " pulse" : "");
     el.innerHTML = `<span class="icon">${b.icon || ""}</span>${b.label}${b.keyName ? `<kbd>${b.keyName}</kbd>` : ""}<span class="fill"></span>`;
-    el.addEventListener("pointerdown", (e) => { e.preventDefault(); if (!el.disabled) { audio(); b.fn(); } });
+    if (b.tap) el.addEventListener("click", () => { if (!el.disabled) { audio(); b.fn(); } });
+    else el.addEventListener("pointerdown", (e) => { e.preventDefault(); if (!el.disabled) { audio(); b.fn(); } });
     el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); } });
     b.el = el;
     (b.keys || []).forEach((k) => (keyMap[k] = b));
@@ -304,7 +353,7 @@ function showOnly(id) {
 function goTitle() {
   stopSpeech(); scene = null; game.step = -1; game.cheese = 0; game.stars = 0;
   showOnly("title"); $("chapter").textContent = "The Adventure Game";
-  setControls([{ icon: "▶", label: "Play!", color: "green", pulse: true, keys: NEXT_KEYS, keyName: "space", fn: () => goStep(0) }]);
+  setControls([{ icon: "▶", label: "Play!", color: "green", pulse: true, tap: true, keys: NEXT_KEYS, keyName: "space", fn: () => goStep(0) }]);
 }
 function next() { sfx.click(); goStep(game.step + 1); }
 function goStep(i) {
@@ -329,8 +378,8 @@ function showStory(s) {
   });
   const read = () => speakLines(s.lines, (i) => els.forEach((e, j) => e.classList.toggle("now", j === i)));
   setControls([
-    { icon: "🔁", label: "Again", color: "gray", keys: ["r"], keyName: "R", fn: read },
-    { icon: "▶", label: "Next", color: "green", keys: NEXT_KEYS, keyName: "space", fn: next },
+    { icon: "🔁", label: "Again", color: "gray", tap: true, keys: ["r"], keyName: "R", fn: read },
+    { icon: "▶", label: "Next", color: "green", tap: true, keys: NEXT_KEYS, keyName: "space", fn: next },
   ]);
   read();
 }
@@ -339,7 +388,7 @@ function showEnd() {
   $("endStats").textContent = `You found ${game.cheese} cheese and won ${game.stars} stars!`;
   sfx.fanfare();
   say("The End! Great job! You helped Mousie get home.");
-  setControls([{ icon: "🔁", label: "Play again", color: "green", pulse: true, keys: NEXT_KEYS, keyName: "space", fn: goTitle }]);
+  setControls([{ icon: "🔁", label: "Play again", color: "green", pulse: true, tap: true, keys: NEXT_KEYS, keyName: "space", fn: goTitle }]);
 }
 function help(text) {
   const h = $("help"); h.textContent = text; h.hidden = false;
@@ -355,7 +404,7 @@ function levelWon(msg) {
   say(msg + " Press Next.");
   setTimeout(() => {
     if (!scene || !scene.won) return;
-    setControls([{ icon: "⭐", label: "Next", color: "green", pulse: true, keys: NEXT_KEYS, keyName: "space", fn: next }]);
+    setControls([{ icon: "⭐", label: "Next", color: "green", pulse: true, tap: true, keys: NEXT_KEYS, keyName: "space", fn: next }]);
   }, 900);
 }
 
@@ -831,7 +880,7 @@ const LEVELS = {
       if (s.done.size === 4 && !s.homeShown) {
         s.homeShown = true; sfx.fanfare(); game.stars++;
         say("You played with everyone! Let's go home!");
-        s.btns = setControls([...s.btns.map((b) => ({ ...b })), { icon: "🏠", label: "Go home!", color: "green", pulse: true, keys: [" ", "Enter"], keyName: "space", fn: next }]);
+        s.btns = setControls([...s.btns.map((b) => ({ ...b })), { icon: "🏠", label: "Go home!", color: "green", pulse: true, tap: true, keys: [" ", "Enter"], keyName: "space", fn: next }]);
         $("help").hidden = true;
       }
     },

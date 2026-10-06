@@ -2,6 +2,10 @@
 
 A picture-book game made from Samar's comic *Mousie, Part 1*.
 
+## Play on an iPhone or iPad
+Open the game link in Safari and turn the phone sideways. To keep it like an app, tap Share → **Add to Home Screen**.
+If there is no sound, check that the ring/silent switch is not on silent.
+
 ## Play on a Mac
 1. Download `Mousie.html`.
 2. Double-click it. It opens in Safari (or Chrome) and works offline.
