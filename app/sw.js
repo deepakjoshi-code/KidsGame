@@ -3,7 +3,7 @@
 // stories, photos and drawings live encrypted in IndexedDB, never in the Cache API.
 // Bump VERSION whenever any shell file changes; old caches are deleted on activate.
 
-const VERSION = "1.0.0";
+const VERSION = "1.0.3";
 const CACHE = "wish-circle-" + VERSION;
 
 // Paths relative to the service worker scope. tests/sw-assets.test.mjs checks that this list
@@ -27,9 +27,11 @@ const SHELL = [
   "js/crypto.js",
   "js/game.js",
   "js/images.js",
+  "js/importbook.js",
   "js/main.js",
   "js/screens/common.js",
   "js/screens/editor.js",
+  "js/screens/finished.js",
   "js/screens/parent.js",
   "js/screens/profiles.js",
   "js/screens/setup.js",
@@ -38,6 +40,9 @@ const SHELL = [
   "js/store.js",
   "js/story.js",
   "js/ui.js",
+  // PDF.js (THIRD_PARTY.md): loaded only when a PDF is imported, precached so that works offline.
+  "vendor/pdfjs/pdf.min.js",
+  "vendor/pdfjs/pdf.worker.min.js",
 ];
 
 const scopeURL = () => self.registration.scope;

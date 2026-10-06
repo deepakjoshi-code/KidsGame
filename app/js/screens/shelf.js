@@ -32,13 +32,27 @@ export function shelf(profileId) {
     screen("",
       h("div", { class: "shelf-actions" },
         button([h("span", { class: "ico", "aria-hidden": "true" }, "✏️"), "Write a new book"], () => nav.editor({ profileId: p.id }), "big go"),
+        button([h("span", { class: "ico", "aria-hidden": "true" }, "📚"), "Add my finished book"], () => openFinished(p.id), "big finished-btn"),
         button([h("span", { class: "ico", "aria-hidden": "true" }, "📷"), "Use photos of my book"], () => nav.editor({ profileId: p.id, photos: true }), "big blue")),
       books.length
         ? h("div", { class: "shelf-grid" }, cards)
         : h("div", { class: "empty card soft" },
           h("span", { class: "big-emoji", "aria-hidden": "true" }, "📚"),
           h("h2", null, "Your shelf is empty"),
-          h("p", null, "Write your first story, or take photos of a book you made!"))));
+          h("p", null, "Write your first story, or bring in a book you already made!"))));
+}
+
+// The "finished book" screen (and its PDF reader) loads only when it's used.
+let finishedLoading = false;
+async function openFinished(profileId) {
+  if (finishedLoading) return;
+  finishedLoading = true;
+  try {
+    const { finishedBook } = await import("./finished.js");
+    if (store.isUnlocked()) finishedBook(profileId);
+  } catch {
+    toast("That couldn't open right now. Please try again.");
+  } finally { finishedLoading = false; }
 }
 
 function lockBtn() { const b = button("🔒", () => nav.lockNow(), "small ghost icon"); b.setAttribute("aria-label", "Lock"); return b; }

@@ -80,6 +80,31 @@ weeks, and any browser may clear data when the device runs low on space. To keep
 - "Erase everything" in the parent area deletes the database and the app's preferences. Backup
   files you saved elsewhere are not touched.
 
+## Third-party code
+
+The app has one third-party library: Mozilla **PDF.js** (Apache-2.0), used only to import a
+child's finished book from a PDF. It's listed in [`THIRD_PARTY.md`](THIRD_PARTY.md) with its
+version, source and the SHA-256 of every file, and a test fails if `vendor/` changes without that
+list changing too.
+
+- **Served from the app itself** (`vendor/pdfjs/`), never from a CDN, and precached for offline
+  use. It's loaded only when a PDF is chosen and runs in a same-origin Web Worker allowed by
+  `worker-src 'self'`. The CSP is unchanged.
+- **No code from the PDF ever runs.** PDF JavaScript, forms (XFA) and scripting are off, and
+  `isEvalSupported: false` stops PDF.js from compiling PDF functions into JavaScript (this is the
+  setting that also mitigates CVE-2024-4367; the vendored version has that bug fixed anyway).
+  WebAssembly is off (`useWasm: false`), so the CSP needs neither `'unsafe-eval'` nor
+  `'wasm-unsafe-eval'`.
+- **Nothing is fetched.** The PDF is read from the chosen file's bytes. No fonts, CMaps or other
+  data files are downloaded. Missing standard fonts use the device's own fonts.
+- **Nothing hidden survives.** Each page is drawn onto a fresh canvas and saved as a new JPEG, so
+  the PDF's metadata, attachments and embedded photos' EXIF data are left behind. Only the page
+  picture, its visible text and the title are kept.
+- **Limits:** PDFs up to 100 MB, and only the first 40 pages are read. Locked (password) and
+  damaged PDFs are refused with a plain message.
+- **Old devices:** PDF.js needs Safari 16.4 or newer (iOS/iPadOS 16.4+). On older devices the app
+  says PDFs can't be read there and suggests adding photos of the pages instead.
+
 ## Reporting a problem
 
 Please report security issues privately through the repository's **Security → Report a

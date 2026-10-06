@@ -9,6 +9,52 @@ import { CAST_BY_KEY, PLACES, ACTIONS } from "./catalog.js";
 import { newId, MAX_PAGES, MAX_CAST } from "./story.js";
 
 const PW = 960, PH = 600; // generated panel size (16:10)
+// Upright phones get taller drawn scenes (up to TALL_MAX high, in steps of TALL_STEP) so the
+// panel fills the width and most of the screen instead of leaving bands of empty paper.
+const TALL_MAX = 1152, TALL_STEP = 48;
+
+// Mix two #rrggbb colours (t = 0 → a, 1 → b).
+function mix(a, b, t) {
+  const p = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("");
+}
+// A taller copy of a drawn 16:10 scene: the scene sits at the bottom (characters keep their size,
+// nothing is stretched or cropped) and its sky is extended upwards, with a few clouds, stars or
+// bubbles to match the place. The cave keeps its rocky ceiling at the very top.
+function tallScene(src, placeKey, H) {
+  const key = Object.prototype.hasOwnProperty.call(PLACES, placeKey) ? placeKey : "forest";
+  const P = PLACES[key];
+  const c = document.createElement("canvas");
+  c.width = PW; c.height = H;
+  const ctx = c.getContext("2d");
+  const E = H - PH, cut = key === "cave" ? 140 : 0;
+  ctx.fillStyle = mix(P.sky[0], P.sky[1], cut / (PH * 0.84));
+  ctx.fillRect(0, cut, PW, E);
+  if (cut) ctx.drawImage(src, 0, 0, PW, cut, 0, 0, PW, cut);
+  ctx.drawImage(src, 0, cut, PW, PH - cut, 0, cut + E, PW, PH - cut);
+  let seed = key.length * 7919 + H;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  if (key === "space") {
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < Math.round(E / 6); i++) { ctx.globalAlpha = 0.4 + 0.5 * rnd(); ctx.fillRect(rnd() * PW, cut + rnd() * E, 3, 3); }
+    ctx.globalAlpha = 1;
+  } else if (key === "ocean") {
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3;
+    for (let i = 0; i < Math.round(E / 40); i++) { ctx.beginPath(); ctx.arc(rnd() * PW, cut + 20 + rnd() * (E - 20), 6 + rnd() * 12, 0, Math.PI * 2); ctx.stroke(); }
+  } else if (!P.dark) {
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    const r = PH * 0.045, n = Math.max(1, Math.round(E / 150));
+    for (let i = 0; i < n; i++) {
+      const cx = PW * (0.08 + ((i * 0.53 + rnd() * 0.25) % 0.75)), cy = cut + E * ((i + 0.5) / n) + (rnd() - 0.5) * 20;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.arc(cx + r * 1.1, cy - r * 0.5, r * 1.2, 0, Math.PI * 2);
+      ctx.arc(cx + r * 2.3, cy, r, 0, Math.PI * 2); ctx.rect(cx, cy - r * 0.2, r * 2.3, r * 1.2);
+      ctx.fill();
+    }
+  }
+  return c;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Reader
@@ -30,19 +76,22 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
     owned.push(u); resolve(u);
   }, "image/png"));
 
-  async function makePanel(page) {
+  async function makePanel(page, tall = PH) {
     if (page.imageId) {
       const url = await store.imageURL(page.imageId).catch(() => null);
       if (url) {
         try { const img = await loadImage(url); return { src: url, w: img.naturalWidth, h: img.naturalHeight, photo: true }; } catch { /* draw a scene instead */ }
       }
     }
-    const c = await renderPanel({ ...page, imageId: null }, sprites, PW, PH);
-    return { src: await toURL(c), w: PW, h: PH, photo: false };
+    let c = await renderPanel({ ...page, imageId: null }, sprites, PW, PH);
+    if (tall > PH) c = tallScene(c, page.place, tall);
+    return { src: await toURL(c), w: PW, h: c.height, photo: false };
   }
-  const panel = (i) => {
-    if (!panels.has(i)) panels.set(i, makePanel(pages[i]).catch(() => ({ src: null, w: PW, h: PH, photo: false })));
-    return panels.get(i);
+  // Panels by page (and, for drawn scenes on upright screens, by height).
+  const panel = (i, tall = PH) => {
+    const k = tall === PH ? i : `${i}:${tall}`;
+    if (!panels.has(k)) panels.set(k, makePanel(pages[i], tall).catch(() => ({ src: null, w: PW, h: PH, photo: false })));
+    return panels.get(k);
   };
   let coverP = null;
   const cover = () => (coverP ||= (async () => {
@@ -57,8 +106,10 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
   const last = pages.length + 1;
   let at = 0;
   let relayout = () => {};
+  let onStageScroll = () => {};
 
   const stage = h("main", { class: "comic-stage", "aria-live": "polite" });
+  stage.addEventListener("scroll", () => onStageScroll(), { passive: true });
   const dots = h("div", { class: "comic-dots", role: "tablist", "aria-label": "Pages" });
   const counter = h("span", { class: "comic-count" });
   const prevBtn = h("button", { type: "button", class: "comic-turn prev", "aria-label": "Previous page", onclick: () => go(at - 1) }, h("span", { "aria-hidden": "true" }, "◀"));
@@ -137,12 +188,36 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
     const frame = h("div", { class: "comic-frame" }, img);
     const talk = talkFor(page);
     const art = h("article", { class: "comic-page", "aria-label": `Page ${i + 1}` }, frame);
+    // "more ↓": shown only when a page's words still don't fit and need scrolling.
+    let scroller = null;
+    const more = h("button", { type: "button", class: "comic-more", hidden: true, "aria-label": "More words below", onclick: () => scroller?.scrollBy({ top: Math.max(60, scroller.clientHeight * 0.7), behavior: "smooth" }) },
+      h("span", { class: "comic-more-pill" }, "more ↓"));
+    const updMore = () => {
+      const sc = scroller;
+      const hidden = !sc || !sc.isConnected || sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 6;
+      more.hidden = hidden;
+      art.classList.toggle("has-more", !hidden);
+    };
+    talk.addEventListener("scroll", updMore, { passive: true });
+    onStageScroll = updMore;
     const speakerAt = new Map();
     let info = { w: PW, h: PH, photo: false };
+    let fetching = 0;
 
     for (const a of layoutActors(page.actors || [], sprites, PW, PH)) {
       if (!speakerAt.has(a.s.id)) speakerAt.set(a.s.id, a.x / PW);
     }
+    // Drawn scenes come in a few heights; ask for another one when the layout wants it.
+    const want = (tall) => {
+      if (info.photo || tall === info.h || tall === fetching) return;
+      fetching = tall;
+      panel(i, tall).then((p) => {
+        if (fetching === tall) fetching = 0;
+        if (disposed || !art.isConnected || p.photo || !p.src) return;
+        info = p; img.src = p.src; relayout();
+      });
+    };
+    const fits = (H) => talk.offsetHeight <= H;
 
     relayout = () => {
       if (!art.isConnected) return;
@@ -150,36 +225,71 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
       if (W < 60 || H < 60) return;
       const portrait = H > W * 1.05;
       const hasTalk = talkEls.length > 0;
-      art.classList.remove("overlay", "below", "beside");
+      art.classList.remove("overlay", "below", "beside", "tight", "cols", "roomy");
       talk.style.width = ""; talk.style.maxHeight = "";
+      scroller = null;
       // 1. Generated scenes with room to spare: bubbles float in the sky, each above its speaker.
       if (!info.photo && !portrait && hasTalk) {
-        const [w, hh] = fit(W, H, info.w, info.h);
+        const [w, hh] = fit(W, H, PW, PH);
         if (w >= 620) {
-          size(img, w, hh);
-          art.classList.add("overlay");
-          frame.appendChild(talk);
-          if (placeInSky(w, hh)) return;
-          art.classList.remove("overlay");
+          want(PH);
+          if (info.h === PH) {
+            size(img, w, hh);
+            art.classList.add("overlay");
+            frame.appendChild(talk);
+            if (placeInSky(w, hh)) { updMore(); return; }
+            art.classList.remove("overlay");
+          }
         }
       }
       // 2. Sideways: words beside the picture. 3. Upright: words under it, large.
       unplace();
       if (hasTalk && !portrait && W > 560) {
+        want(PH);
         art.classList.add("beside");
         art.appendChild(talk);
-        const tw = Math.min(420, Math.max(240, Math.round(W * 0.34)));
-        talk.style.width = tw + "px";
+        talk.appendChild(more);
+        // Try to fit every word without scrolling: normal type, then tighter type, then a wider
+        // two-column panel of words (the picture gets smaller). Last resort: scroll + "more ↓".
+        const nb = talk.querySelectorAll(".comic-bubble").length;
+        const base = Math.min(420, Math.max(240, Math.round(W * 0.34)));
+        const tries = [[base, ""], [base, "tight"]];
+        if (nb >= 2) for (const f of [0.46, 0.56]) tries.push([Math.max(base, Math.min(640, Math.round(W * f))), "tight cols"]);
+        else tries.push([Math.max(base, Math.min(560, Math.round(W * 0.46))), "tight"]);
+        let tw = base;
+        for (const [width, cls] of tries) {
+          art.classList.remove("tight", "cols");
+          if (cls) art.classList.add(...cls.split(" "));
+          talk.style.width = (tw = width) + "px";
+          if (fits(H)) break;
+        }
         talk.style.maxHeight = H + "px";
         const [w, hh] = fit(W - tw - 16, H, info.w, info.h);
         size(img, w, hh);
+        scroller = talk;
       } else {
         art.classList.add("below");
         art.appendChild(talk);
+        art.appendChild(more);
+        if (hasTalk && portrait && talk.offsetHeight > H * 0.55) art.classList.add("tight");
         const th = hasTalk ? talk.offsetHeight + 12 : 0;
-        const [w, hh] = fit(W, Math.max(H * 0.45, H - th), info.w, info.h);
+        const avail = Math.max(H * 0.45, H - th);
+        // Upright: a drawn scene grows taller to fill the screen (photos keep their own shape).
+        if (!info.photo) {
+          const tall = portrait ? Math.max(PH, Math.min(TALL_MAX, Math.floor((avail / W) * PW / TALL_STEP) * TALL_STEP)) : PH;
+          want(tall);
+        }
+        let [w, hh] = fit(W, avail, info.w, info.h);
+        // Photos keep their shape, so spare room upright goes to bigger words instead.
+        if (portrait && hasTalk && info.photo && !art.classList.contains("tight")) {
+          art.classList.add("roomy");
+          if (talk.offsetHeight + 12 + hh > H) art.classList.remove("roomy");
+          [w, hh] = fit(W, Math.max(H * 0.45, H - talk.offsetHeight - 12), info.w, info.h);
+        }
         size(img, w, hh);
+        scroller = stage;
       }
+      updMore();
     };
 
     const bubbleEls = () => [...talk.querySelectorAll(".comic-bubble")];
@@ -221,6 +331,7 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
 
     panel(i).then((p) => {
       if (disposed || !art.isConnected) return;
+      if (!p.photo && img.getAttribute("src")) return; // a taller scene already arrived
       info = p;
       art.classList.toggle("photo", !!p.photo);
       if (p.src) img.src = p.src;
@@ -237,6 +348,7 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
       book.author ? h("p", { class: "comic-by" }, "by ", book.author) : null);
     const art = h("article", { class: "comic-page comic-cover", "aria-label": "Cover" }, head, frame);
     talkEls = [head];
+    onStageScroll = () => {};
     speech = [{ role: "narrator", text: (book.title || "My Story") + (book.author ? `, by ${book.author}.` : ".") }];
     let info = null;
     relayout = () => {
@@ -256,6 +368,7 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
 
   function viewEnd() {
     talkEls = [];
+    onStageScroll = () => {};
     speech = [{ role: "narrator", text: "The End." }];
     relayout = () => {};
     return h("article", { class: "comic-page comic-end", "aria-label": "The end" },

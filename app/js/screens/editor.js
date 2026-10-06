@@ -13,14 +13,29 @@ const ROLES = [["hero", "⭐ Hero"], ["friend", "🙂 Friend"], ["villain", "�
 const iconBtn = (icon, name, fn, cls = "small icon ghost") => { const b = button(icon, fn, cls); b.setAttribute("aria-label", name); return b; };
 const imageIdsOf = (b) => new Set([b.cover, ...b.pages.map((p) => p.imageId), ...b.cast.map((c) => c.imageId)].filter(Boolean));
 
-export function editor({ profileId, bookId, photos = false }) {
+// While an edit is open, the store's unused-image sweep stays off (the draft's new photos and
+// drawings aren't in any saved book yet). Only one editor screen exists at a time.
+let openDraft = null;
+function endEdit() { if (openDraft) store.endDraft(openDraft); openDraft = null; }
+
+// A prepared new book (e.g. from "Add my finished book") opens straight at the review step:
+// editor({ profileId, book, created: [imageIds it stored], step: "review" }). Those images are
+// treated like ones added here: leaving without saving deletes them.
+export function editor({ profileId, bookId, photos = false, book = null, created: prepared = [], step = null }) {
   const profile = store.get(profileId);
   if (!profile) return nav.picker();
   const original = bookId ? store.get(bookId) : null;
-  const created = new Set(); // images stored during this edit and not yet part of a saved book
+  const created = new Set(original ? [] : prepared); // images stored during this edit and not yet part of a saved book
+  endEdit();
+  openDraft = store.beginDraft();
   const ed = { profile, original, created, dirty: false, photosFirst: photos };
   if (original) { ed.draft = structuredClone(original); reviewStep(ed); }
-  else { ed.write = { title: "", author: profile.name, text: "", photos: [] }; writeStep(ed); }
+  else if (book && (step === "review" || step === null)) {
+    ed.draft = { ...structuredClone(book), profileId: profile.id };
+    ed.imported = true;
+    ed.dirty = true;
+    reviewStep(ed);
+  } else { ed.write = { title: "", author: profile.name, text: "", photos: [] }; writeStep(ed); }
 }
 
 async function discard(ed) {
@@ -32,6 +47,7 @@ async function leave(ed) {
   const hasStuff = ed.dirty || ed.created.size || (ed.write && (ed.write.text.trim() || ed.write.photos.length));
   if (hasStuff && !(await confirmBox("Leave without saving?", "Your changes to this book will be lost.", "Leave", "danger"))) return;
   await discard(ed);
+  endEdit();
   if (ed.original) nav.openBook(ed.original.id);
   else nav.shelf(ed.profile.id);
 }
@@ -309,6 +325,7 @@ function reviewStep(ed) {
       for (const id of candidates) if (!keep.has(id)) await store.deleteImage(id).catch(() => {});
       ed.created.clear();
       ed.dirty = false;
+      endEdit();
       toast("Your book is saved! 📚");
       nav.openBook(saved.id);
     });
@@ -317,6 +334,7 @@ function reviewStep(ed) {
     if (!(await confirmBox(`Delete "${ed.original.title}"?`, "The book, its drawings and its photos will be gone for good.", "Delete book"))) return;
     await discard(ed);
     await deleteBookData(ed.original);
+    endEdit();
     toast("Book deleted.");
     nav.shelf(ed.profile.id);
   }
@@ -338,6 +356,9 @@ function reviewStep(ed) {
     show(
       topbar({ title: ed.original ? "Edit book" : "Check your book", back }),
       screen("",
+        ed.imported ? h("div", { class: "card sun stack ed-welcome" },
+          h("h2", null, "📚 Your pages are in!"),
+          h("p", null, "Now make it yours: give your characters names, type what each page says if you like, and pick a game for some pages. Then press Save.")) : null,
         h("div", { class: "card stack" },
           h("div", { class: "two-col" }, field("Title", title), field("Author", author))),
         h("section", { class: "ed-section" },

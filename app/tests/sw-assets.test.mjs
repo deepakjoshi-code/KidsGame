@@ -12,6 +12,7 @@ const SW = readFileSync(join(APP, "sw.js"), "utf8");
 const EXCLUDED_DIRS = new Set(["tests", "tools", "docs", "node_modules", "test-results", "playwright-report"]);
 const EXCLUDED_FILES = new Set(["_headers", "_redirects", "package.json", "package-lock.json", "sw.js", "netlify.toml", "wrangler.toml"]);
 const EXCLUDED_EXT = /\.(md|py|map|log|txt)$/i;
+const EXCLUDED_NAME = /^(LICEN[CS]E|NOTICE|COPYING)(\..*)?$/i; // licence texts shipped with vendor/ code
 
 function runtimeFiles(dir = APP, out = []) {
   for (const name of readdirSync(dir)) {
@@ -19,7 +20,7 @@ function runtimeFiles(dir = APP, out = []) {
     const p = join(dir, name);
     const r = relative(APP, p).split("\\").join("/");
     if (statSync(p).isDirectory()) { if (!EXCLUDED_DIRS.has(name)) runtimeFiles(p, out); continue; }
-    if (EXCLUDED_FILES.has(r) || EXCLUDED_EXT.test(name)) continue;
+    if (EXCLUDED_FILES.has(r) || EXCLUDED_EXT.test(name) || EXCLUDED_NAME.test(name)) continue;
     out.push(r);
   }
   return out;
