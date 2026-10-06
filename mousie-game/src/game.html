@@ -1066,8 +1066,8 @@ const LEVELS = {
 };
 
 // The big tree with the treehouse and a ladder (ladder top is at y = 170, x ≈ 555).
-function drawTreeHouse(rungs = 10, scroll = 300) {
-  drawForest(scroll, 0.12);
+function drawTreeHouse(rungs = 10, scroll = 300, forest = true) {
+  if (forest) drawForest(scroll, 0.12);
   // tree trunk & branches
   ctx.fillStyle = "#7a5534"; ctx.strokeStyle = INK; ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(620, H); ctx.lineTo(650, 120); ctx.lineTo(780, 120); ctx.lineTo(820, H); ctx.closePath(); ctx.fill(); ctx.stroke();
