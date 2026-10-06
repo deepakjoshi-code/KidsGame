@@ -893,7 +893,7 @@ const LEVELS = {
       if (!s.dead) {
         s.rx -= 45 * dt;
         if (s.rx < 380) { s.rx += 230; s.vy = -600; sfx.squeak(); addText("Eek!", 200, GROUND - 150, "#fff", 40); }
-      } else s.rot = Math.max(-1.45, s.rot - 2.5 * dt);
+      } else { s.flop = Math.min(1, (s.flop || 0) + dt * 1.6); s.rot = (Math.PI - 0.08) * s.flop; } // flips onto its back, legs up
       s.arrows.forEach((a) => {
         a.x += a.vx * dt; a.y += a.vy * dt;
         if (!a.done && !s.dead && a.x > s.rx - 60) {
@@ -908,7 +908,7 @@ const LEVELS = {
     draw(s) {
       drawCave();
       drawMouse(200, GROUND + s.my, 1, { t: s.t });
-      drawRaptor(s.rx, GROUND, 1.35, { t: s.t, walk: !s.dead, flip: true, hurt: s.hurt, dead: s.dead, rot: s.rot });
+      drawRaptor(s.rx, GROUND - 165 * (s.flop || 0), 1.35, { t: s.t, walk: !s.dead, flip: true, hurt: s.hurt, dead: s.dead, rot: s.rot });
       drawBird(300, 250 + Math.sin(s.t * 2) * 15, 1, { t: s.t, bow: true });
       s.arrows.forEach((a) => {
         ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(Math.atan2(a.vy, a.vx));
