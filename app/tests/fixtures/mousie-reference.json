@@ -1,0 +1,299 @@
+[
+ {
+  "story": "daddy1",
+  "ch": "At home",
+  "lines": [
+   [
+    "Mousie",
+    "Hi Daddy. Can I go on an adventure with Birdie?"
+   ]
+  ]
+ },
+ {
+  "story": "daddy2",
+  "ch": "At home",
+  "lines": [
+   [
+    "Daddy",
+    "Ok."
+   ]
+  ]
+ },
+ {
+  "story": "hibirdie",
+  "ch": "In the forest",
+  "lines": [
+   [
+    "Birdie",
+    "Hi Mousie!",
+    "chirp"
+   ]
+  ]
+ },
+ {
+  "story": "adventure",
+  "ch": "In the forest",
+  "lines": [
+   [
+    "Mousie",
+    "We're going on an adventure!"
+   ]
+  ]
+ },
+ {
+  "level": "run",
+  "ch": "Level 1 · Forest Run"
+ },
+ {
+  "story": "cave",
+  "ch": "The cave",
+  "lines": [
+   [
+    "Mousie",
+    "Look! A cave!"
+   ],
+   [
+    "Birdie",
+    "Let's go inside!"
+   ]
+  ]
+ },
+ {
+  "story": "inside",
+  "ch": "The cave",
+  "lines": [
+   [
+    "Narrator",
+    "Mousie and Birdie tiptoe into the dark cave."
+   ]
+  ]
+ },
+ {
+  "story": "raptor",
+  "ch": "The cave",
+  "lines": [
+   [
+    "Birdie",
+    "Look, a Velociraptor!"
+   ],
+   [
+    "Mousie",
+    "Oh no! What do we do?"
+   ]
+  ]
+ },
+ {
+  "story": "fight",
+  "ch": "The cave",
+  "lines": [
+   [
+    "Birdie",
+    "I think we should fight it."
+   ],
+   [
+    "Mousie",
+    "Ok."
+   ]
+  ]
+ },
+ {
+  "level": "raptor",
+  "ch": "Level 2 · Velociraptor"
+ },
+ {
+  "story": "arrows",
+  "ch": "The cave",
+  "lines": [
+   [
+    "Birdie",
+    "Good, I took the arrows and fight!"
+   ]
+  ]
+ },
+ {
+  "story": "trexcame",
+  "ch": "The cave",
+  "lines": [
+   [
+    "Birdie",
+    "Hooray, Velociraptor died!"
+   ],
+   [
+    "T-Rex",
+    "ROOR!",
+    "roar"
+   ],
+   [
+    "Mousie",
+    "Are you sure hooray? T-Rex came!"
+   ]
+  ]
+ },
+ {
+  "story": "trex",
+  "ch": "The Mighty T-Rex",
+  "lines": [
+   [
+    "T-Rex",
+    "ROOR!",
+    "roar"
+   ],
+   [
+    "Mousie",
+    "Let's fight it!"
+   ]
+  ]
+ },
+ {
+  "story": "bombarrows",
+  "ch": "The Mighty T-Rex",
+  "lines": [
+   [
+    "Birdie",
+    "Ok, let's fight it with bombs and arrows!"
+   ]
+  ]
+ },
+ {
+  "story": "bigbomb",
+  "ch": "The Mighty T-Rex",
+  "lines": [
+   [
+    "Mousie",
+    "Look how big the bomb is! Let's do it!"
+   ]
+  ]
+ },
+ {
+  "level": "trex",
+  "ch": "Level 3 · The Mighty T-Rex"
+ },
+ {
+  "story": "boom",
+  "ch": "The Mighty T-Rex",
+  "lines": [
+   [
+    "Narrator",
+    "BOOM!",
+    "boom"
+   ],
+   [
+    "Mousie",
+    "We won the day!"
+   ]
+  ]
+ },
+ {
+  "story": "snake1",
+  "ch": "A new friend",
+  "lines": [
+   [
+    "Mousie",
+    "Hi Snake!! Why are you here??"
+   ]
+  ]
+ },
+ {
+  "story": "snake2",
+  "ch": "A new friend",
+  "lines": [
+   [
+    "Snake",
+    "Your daddy sent me to see if you need any help."
+   ]
+  ]
+ },
+ {
+  "story": "lion1",
+  "ch": "A new friend",
+  "lines": [
+   [
+    "Snake",
+    "Guys!! Look at my pet lion!"
+   ]
+  ]
+ },
+ {
+  "story": "lion2",
+  "ch": "A new friend",
+  "lines": [
+   [
+    "Lion",
+    "ZOOOOM!",
+    "zoom"
+   ]
+  ]
+ },
+ {
+  "story": "truck1",
+  "ch": "A new friend",
+  "lines": [
+   [
+    "Snake",
+    "Guys!! Look at my fire truck!!"
+   ]
+  ]
+ },
+ {
+  "story": "truck2",
+  "ch": "A new friend",
+  "lines": [
+   [
+    "Fire truck",
+    "NEEE-NAW, NEEE-NAW!",
+    "siren"
+   ]
+  ]
+ },
+ {
+  "level": "parade",
+  "ch": "Level 4 · Play with Friends"
+ },
+ {
+  "story": "yah",
+  "ch": "Time to go home",
+  "lines": [
+   [
+    "Everyone",
+    "YAH!",
+    "fanfare"
+   ],
+   [
+    "Mousie",
+    "OK!!"
+   ],
+   [
+    "Birdie",
+    "Let's go home!!"
+   ],
+   [
+    "Snake",
+    "Hehe",
+    "hehe"
+   ]
+  ]
+ },
+ {
+  "level": "climb",
+  "ch": "Level 5 · Climb Home"
+ },
+ {
+  "story": "treehouse",
+  "ch": "Home!",
+  "lines": [
+   [
+    "Mousie",
+    "It's perfect! Safe and wonderful."
+   ],
+   [
+    "Birdie",
+    "Hooray! We made it!",
+    "fanfare"
+   ]
+  ]
+ },
+ {
+  "end": true,
+  "ch": "The End"
+ }
+]

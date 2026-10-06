@@ -84,6 +84,17 @@ Upload the `app/` folder to any static host with HTTPS. Leave out `tests/`, `*.m
     Cloudflare Pages for the strongest setup.
   - The app uses relative paths throughout, so it works under `https://user.github.io/repo/`.
 
+## Claude AI comic reader (optional)
+
+"Build games with Claude AI" (Grown-ups) needs the family's comic reader, a small Cloudflare
+Worker in [`../worker`](../worker/README.md) that holds the Anthropic API key. Deploy it once
+(`npm i`, `npx wrangler login`, `npx wrangler secret put ANTHROPIC_API_KEY`,
+`npx wrangler secret put FAMILY_CODE`, `npx wrangler deploy`); it serves
+`https://api.rawrbooks.com`, the only extra address the CSP allows (`connect-src`). Without it the
+app works exactly as before, fully on the device. `js/ai.js` is the app side;
+`tests/ai.test.mjs` and `tests/worker.test.mjs` test both (the Worker tests need `npm i` in
+`worker/` first and are skipped otherwise).
+
 ## Layout
 
 ```

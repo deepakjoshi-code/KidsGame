@@ -67,6 +67,15 @@
 .g-castrow { margin: 0; font-size: clamp(2.2rem, 6vw, 3.6rem); line-height: 1.1; }
 .g-stars { margin: 0; font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.1; animation: g-pop .6s ease-out; }
 @keyframes g-pop { from { transform: scale(.3); } 70% { transform: scale(1.15); } }
+/* Chapter cards: a short pause between parts of the story */
+.game.g-chap .g-overlay { background: radial-gradient(circle at 50% 40%, #fffaf0 0%, var(--g-paper) 55%, var(--g-paper-2) 100%); }
+.g-chapno {
+  margin: 0; font-family: var(--g-display); font-weight: 700; font-size: clamp(1rem, 2.6vw, 1.4rem);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--g-berry);
+}
+.g-chapter { color: var(--g-sky); animation: g-chap-in .5s ease-out; }
+@keyframes g-chap-in { from { opacity: 0; transform: translateY(18px); } }
+@media (prefers-reduced-motion: reduce) { .g-chapter { animation: none; } }
 
 /* Caption: only shown when a phone is held upright */
 .g-caption { display: none; }

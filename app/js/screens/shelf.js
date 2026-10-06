@@ -74,12 +74,14 @@ export function openBook(id) {
   stopSpeech();
   showComic(book, {
     onBack: () => { stopSpeech(); shelf(book.profileId); },
-    onPlay: () => play(book.id),
+    onPlay: () => playBook(book.id),
     onEdit: () => { stopSpeech(); nav.editor({ profileId: book.profileId, bookId: book.id }); },
   });
 }
 
-function play(id) {
+// Play a book's game; Back (or the end) returns to its comic. Also used right after a finished
+// book has been made, so the child goes straight into their game.
+export function playBook(id) {
   const book = store.get(id);
   if (!book) return shelf(session.profileId);
   stopSpeech();

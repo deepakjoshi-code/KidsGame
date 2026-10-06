@@ -20,7 +20,7 @@ by a 6-year-old.
   `document.write`, `eval` or `new Function`. Build DOM with `h()` from `js/ui.js` (text goes in
   through text nodes). Set styles through `el.style`/classes, never `setAttribute("style")`.
 - **CSP** (meta tag in index.html, plus `_headers` for hosts):
-  `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'`.
+  `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self' https://api.rawrbooks.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'`.
   No inline `<script>` or `<style>` and no `style=` attributes in HTML.
 - **No build step.** Plain ES modules (`<script type="module" src="js/main.js">`), served as static
   files. It must work from any static host over HTTPS and from `python3 -m http.server`.

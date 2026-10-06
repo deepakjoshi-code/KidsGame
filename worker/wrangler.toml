@@ -1,0 +1,31 @@
+# Wish Circle comic reader (Cloudflare Worker). See README.md for deploying.
+name = "wish-circle-comic"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# Serve the Worker on api.rawrbooks.com (rawrbooks.com must be a zone on your Cloudflare account).
+routes = [
+  { pattern = "api.rawrbooks.com", custom_domain = true }
+]
+
+# The app's address(es) that may call this Worker (comma-separated). Leave as is unless you host
+# the app somewhere else.
+[vars]
+ALLOWED_ORIGINS = "https://rawrbooks.com,https://www.rawrbooks.com,https://deepakjoshi-code.github.io,http://localhost:8000"
+BOOKS_PER_HOUR = "10"
+
+# Per-IP rate limits (Workers Rate Limiting; the period can only be 10 or 60 seconds).
+# The hourly book cap (BOOKS_PER_HOUR) is enforced on top of these.
+[[ratelimits]]
+name = "BOOK_LIMITER"
+namespace_id = "7301"
+simple = { limit = 3, period = 60 }
+
+[[ratelimits]]
+name = "CHECK_LIMITER"
+namespace_id = "7302"
+simple = { limit = 10, period = 60 }
+
+[observability]
+enabled = true

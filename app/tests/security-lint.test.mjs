@@ -24,7 +24,7 @@ const jsFiles = [...walk(join(APP, "js"), (p) => p.endsWith(".js")), join(APP, "
 const cssFiles = walk(join(APP, "css"), (p) => p.endsWith(".css"));
 const htmlFiles = [join(APP, "index.html")].filter(existsSync);
 
-export const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
+export const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self' https://api.rawrbooks.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 // Blank out comments but keep line numbers and string contents intact.
 function stripJsComments(src) {
@@ -88,9 +88,11 @@ const JS_RULES = [
 
 // XML namespace identifiers are not network requests.
 const NAMESPACES = new Set(["http://www.w3.org/2000/svg", "http://www.w3.org/1999/xhtml", "http://www.w3.org/1999/xlink", "http://www.w3.org/XML/1998/namespace"]);
+// The family's comic reader (Claude AI, off by default) is the one host the CSP's connect-src allows.
+const CONNECT_HOSTS = new Set(["https://api.rawrbooks.com"]);
 function externalUrls(raw) {
   return findAll(raw, /\b(https?|wss?|ftp):\/\/[^\s"'`)<>]*/i)
-    .filter((h) => !NAMESPACES.has(h.match.replace(/[.,;]+$/, "")));
+    .filter((h) => !NAMESPACES.has(h.match.replace(/[.,;]+$/, "")) && !CONNECT_HOSTS.has(h.match.replace(/[.,;/]+$/, "")));
 }
 // Protocol-relative URLs in markup/CSS: src="//cdn…", url(//cdn…)
 function protocolRelative(raw) {

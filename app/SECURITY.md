@@ -6,8 +6,10 @@ it works.
 
 ## The short version
 
-- Everything stays **on the device**. There are no servers, accounts, analytics, ads, third-party
-  scripts, fonts or CDNs. The app never sends a child's data anywhere.
+- Everything stays **on the device**. There are no accounts, analytics, ads, third-party
+  scripts, fonts or CDNs. The app never sends a child's data anywhere, with one opt-in exception:
+  if a parent turns on **Build games with Claude AI**, the pictures of a finished comic being
+  added are sent to the family's own comic reader and on to Anthropic's Claude (see below).
 - Everything is **encrypted at rest** with a key that only the parent's passcode can unlock.
 - **If you forget the passcode, the data can't be recovered.** Not by us, not by anyone. Keep the
   passcode somewhere safe and save backups.
@@ -21,7 +23,7 @@ it works.
 | **Siblings** | Each child has their own profile. An optional picture lock keeps siblings out of each other's shelves. The parent area (settings, backups, deleting things) always needs the parent passcode. |
 | **Malicious imported files** (shared `.wishbook` books, backups, photos) | Imports are parsed as data and checked strictly. Every image is decoded and redrawn on a canvas, which also removes hidden metadata such as GPS location. A backup is only accepted after every record in it decrypts and passes its integrity check. |
 | **Script injection** (a story containing `<script>`, odd characters and so on) | The app never turns text into HTML. No `innerHTML`, `eval` or similar is used, and the DOM is built from text nodes. A strict Content-Security-Policy allows only the app's own scripts and styles: no inline code and no other origins. A lint test enforces these rules on every change. |
-| **Data leaking over the network** | The CSP sets `connect-src 'self'` and allows no third-party origins at all, so even injected code would have nowhere to send data. The service worker caches only the app's own files and never touches stories or photos. |
+| **Data leaking over the network** | The CSP sets `connect-src 'self' https://api.rawrbooks.com`: the only other origin is the family's own comic reader (used only when Claude AI is turned on), so even injected code would have nowhere else to send data. No other third-party origins are allowed. The service worker caches only the app's own files and never touches stories or photos. |
 | **Records being swapped or edited on disk** | Each record is sealed with AES-256-GCM, with its id as additional authenticated data. A changed, truncated or swapped record fails to decrypt and is ignored. |
 
 ## What is not protected
@@ -47,6 +49,33 @@ it works.
 - **Hosting without headers.** On GitHub Pages only the CSP `<meta>` tag applies, so there's no
   `frame-ancestors`/`X-Frame-Options` protection against framing. Netlify and Cloudflare Pages
   apply the full [`_headers`](_headers).
+
+## Claude AI (optional, off by default)
+
+Grown-ups → **✨ Build games with Claude AI** lets Anthropic's Claude read a finished comic and plan
+its game. It stays off until a parent ticks the consent box, types the family code and turns it
+on; the setting itself is stored encrypted like everything else.
+
+- **What is sent, and when:** only when a child adds a finished comic while it's on, and only that
+  comic's panel pictures, re-drawn as JPEGs of at most 1024 px (which also drops photo metadata),
+  plus the file's name as a title hint. No child names, profiles, passcodes or other books.
+- **Where:** to `https://api.rawrbooks.com`, a Cloudflare Worker the family deploys themselves
+  (`worker/`). It holds the Anthropic API key as a secret (the key is never in the app), checks
+  the **family code** (a second secret, compared in constant time), allows only the app's own
+  web addresses (CORS allow-list), rate-limits per IP (before the code is checked, so guessing is
+  slow), refuses oversized requests early, and passes the pictures to Anthropic's API in one
+  request. It **stores nothing** and **logs no pictures or words**, only counts, sizes, timings
+  and status codes.
+- **At Anthropic:** handled under Anthropic's API terms (API inputs aren't used for training by
+  default). Server-side refusal fallbacks are on, so a declined request may be answered by
+  another Claude model in the same call.
+- **What comes back** is treated as untrusted data: the app checks every field strictly (types,
+  lengths, character ids, boxes inside the picture, known places, level kinds, weapons and
+  treasure) and drops the answer if anything is off. The comic's own text is data to Claude too:
+  the prompt tells it never to follow instructions written in a comic.
+- **If it can't help** (offline, busy, quota, a refusal), the book is made on the device as
+  before, and the parent is told gently.
+- The Content-Security-Policy allows exactly this one extra address in `connect-src`.
 
 ## Crypto details
 

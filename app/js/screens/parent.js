@@ -6,6 +6,7 @@ import { exportBookPack, importBookPack } from "../comic.js";
 import { nav, screen, field, busy, prefs, AUTOLOCK_CHOICES, autolockMinutes, eraseEverything, avatarBadge, todayStamp } from "./common.js";
 import { profileEditor } from "./profiles.js";
 import { restoreFlow } from "./setup.js";
+import { aiSettings, saveAiSettings, aiReady, testConnection, validEndpoint, DEFAULT_ENDPOINT } from "../ai.js";
 
 export function parent() {
   const kids = store.list("profile");
@@ -124,7 +125,7 @@ export function parent() {
   const explainer = h("section", { class: "card explainer" },
     h("h2", null, "🛡️ How your data is protected"),
     h("ul", null,
-      h("li", null, h("strong", null, "It stays on this device. "), "Wish Circle has no accounts, no servers, no ads and no tracking. It never sends your children's stories, drawings or photos anywhere."),
+      h("li", null, h("strong", null, "It stays on this device. "), "Wish Circle has no accounts, no ads and no tracking. It never sends your children's stories, drawings or photos anywhere, unless you turn on Claude AI above: then only the comic pages of a book being added are sent to be read."),
       h("li", null, h("strong", null, "It's locked with your passcode. "), "Everything is encrypted with AES-256, a strong standard. The key is made from your passcode, and it is only kept in memory while the app is unlocked."),
       h("li", null, h("strong", null, "Wrong guesses slow down. "), "After 5 wrong passcodes, the app makes you wait longer and longer before the next try."),
       h("li", null, h("strong", null, "Photos are cleaned. "), "Hidden details in photos, such as location, are removed before saving."),
@@ -141,7 +142,78 @@ export function parent() {
     topbar({ title: "⚙️ Grown-ups", back, actions: [] }),
     screen("parent narrow",
       h("p", { class: "small muted" }, "Only grown-ups with the passcode can see this page. Leave it with ‹ Back."),
-      children, backup, share, security, storage, explainer, danger));
+      children, aiSection(), backup, share, security, storage, explainer, danger));
+}
+
+// ----- Claude AI: reads a finished comic and plans its game (off until a grown-up turns it on) -----
+function aiSection() {
+  const s = aiSettings();
+  const consent = h("input", { type: "checkbox", class: "ai-check", checked: !!s.consentAt });
+  const code = h("input", { class: "input", type: "password", autocomplete: "off", spellcheck: "false", value: s.familyCode, placeholder: "The family code from setting up the comic reader" });
+  const endpoint = h("input", { class: "input", type: "url", autocomplete: "off", spellcheck: "false", value: s.endpoint, inputmode: "url" });
+  const result = h("p", { class: "ai-result small", role: "status", "aria-live": "polite" });
+  const status = h("span", { class: "status-pill" });
+  const onOff = h("button", { type: "button", class: "fb-toggle ai-switch", role: "switch" },
+    h("span", { class: "fb-toggle-ico", "aria-hidden": "true" }, "✨"),
+    h("span", { class: "fb-toggle-text" }, h("strong", null, "Use Claude AI for finished comics"), h("span", { class: "ai-switch-sub" })),
+    h("span", { class: "fb-knob", "aria-hidden": "true" }));
+  const paint = (cur) => {
+    const on = aiReady(cur);
+    onOff.setAttribute("aria-checked", String(on));
+    onOff.querySelector(".ai-switch-sub").textContent = on ? "On: finished comics are read by Claude." : "Off: finished comics are made on this device only.";
+    status.className = "status-pill " + (on ? "good" : "warn");
+    status.textContent = on ? "✓ On" : "Off";
+  };
+  paint(s);
+  const say = (msg, ok) => { result.textContent = msg; result.className = "ai-result small " + (ok ? "good" : ok === false ? "bad" : ""); };
+
+  // Saving the fields: the code and the address are kept (encrypted) as soon as they change.
+  const keepFields = async () => {
+    const ep = validEndpoint(endpoint.value);
+    if (!ep) { say("That address doesn't look right. It should be a secure (https) address.", false); return null; }
+    return saveAiSettings({ familyCode: code.value, endpoint: ep });
+  };
+  code.addEventListener("change", () => { keepFields().then((c) => c && paint(c)).catch(() => {}); });
+  endpoint.addEventListener("change", () => { keepFields().then((c) => c && paint(c)).catch(() => {}); });
+  consent.addEventListener("change", async () => {
+    const c = await saveAiSettings({ consentAt: consent.checked ? Date.now() : null }).catch(() => null);
+    if (c) { paint(c); if (!consent.checked) say("Claude AI is off. Nothing will be sent.", null); }
+  });
+  onOff.addEventListener("click", async () => {
+    const cur = aiSettings();
+    if (aiReady(cur)) { paint(await saveAiSettings({ enabled: false })); say("Claude AI is off. Nothing will be sent.", null); return; }
+    if (!consent.checked) { say("Please tick the box to agree first.", false); consent.focus(); return; }
+    if (!code.value.trim()) { say("Please type the family code first.", false); code.focus(); return; }
+    const kept = await keepFields();
+    if (!kept) return;
+    paint(await saveAiSettings({ enabled: true, consentAt: cur.consentAt || Date.now() }));
+    say("Claude AI is on. Try “Test connection” to check it works.", true);
+  });
+  const testBtn = button("🔌 Test connection", () => busy(testBtn, "Checking…", async () => {
+    const ep = validEndpoint(endpoint.value);
+    if (!ep) { say("That address doesn't look right. It should be a secure (https) address.", false); return; }
+    const r = await testConnection({ ...aiSettings(), endpoint: ep, familyCode: code.value.trim() });
+    say((r.ok ? "✓ " : "✗ ") + r.message, r.ok);
+  }), "blue");
+  const showCode = h("input", { type: "checkbox", class: "ai-check", onchange: (e) => { code.type = e.target.checked ? "text" : "password"; } });
+
+  return h("section", { class: "card stack ai-card" },
+    h("div", { class: "row ai-head" }, h("h2", null, "✨ Build games with Claude AI"), status),
+    h("p", null, "When this is on and a child adds a finished comic (a PDF or photos of the pages), the comic's pages are sent to Anthropic's Claude AI. Claude reads the words in the speech bubbles, finds the characters and plans the game, so the game uses the comic's own words, drawings and adventure."),
+    h("ul", { class: "ai-facts" },
+      h("li", null, h("strong", null, "What is sent: "), "only the pictures of that comic's pages, made smaller. No names, profiles, passcodes or other books."),
+      h("li", null, h("strong", null, "Where: "), "to your family's comic reader (", DEFAULT_ENDPOINT.replace(/^https:\/\//, ""), "), which passes them to Anthropic and sends back the answer. It stores nothing and keeps no copy of the pages or words."),
+      h("li", null, h("strong", null, "Anthropic: "), "handles the pages under its API terms (by default, API data isn't used to train its models). The finished game is saved encrypted on this device, like every other book."),
+      h("li", null, h("strong", null, "When it's off: "), "nothing is sent, and finished books are made on this device with a simpler game.")),
+    h("label", { class: "ai-consent" }, consent, h("span", null, "I agree to send my child's comic pages to Anthropic's Claude to make their games.")),
+    field("Family code", code, "The secret code you chose when setting up the comic reader. Only this family's code can use it."),
+    h("label", { class: "ai-consent small" }, showCode, h("span", null, "Show the code")),
+    h("details", { class: "ai-advanced" },
+      h("summary", null, "Advanced"),
+      field("Comic reader address", endpoint, `Normally ${DEFAULT_ENDPOINT}. The app's security settings only allow that address.`)),
+    onOff,
+    h("div", { class: "row" }, testBtn),
+    result);
 }
 
 function changePasscode() {

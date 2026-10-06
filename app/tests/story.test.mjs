@@ -125,11 +125,16 @@ test("Mousie-style story: dad dedupe, battle and villain detection", () => {
   assert.ok(b.pages.some((p) => p.action === "climb"));
   assert.equal(b.pages[0].action, "journey");
   assert.equal(b.pages[0].place, "forest");
+  // Mapped like the hand-made Mousie game: run into the jungle, fight the raptor (arrows + a
+  // bomb), climb the ladder home. No generic fireworks level at the end any more.
   const plan = planGame(b);
-  const kinds = levels(plan).map((s) => s.kind);
-  assert.ok(kinds.includes("battle"));
-  assert.ok(kinds.includes("climb"));
-  assert.equal(kinds.at(-1), "celebrate");
+  const lv = levels(plan);
+  assert.deepEqual(lv.map((s) => s.kind), ["journey", "battle", "climb"]);
+  assert.equal(lv[1].villain, raptor.id);
+  assert.equal(lv[1].weapon, "🏹");
+  assert.equal(lv[1].superWeapon, "💣");
+  assert.equal(lv[2].to, "home");
+  assert.equal(plan.at(-1).type, "story", "the game ends on the last panel, then The End");
 });
 
 test("a battle with no villain gets a Monster", () => {
@@ -140,7 +145,10 @@ test("a battle with no villain gets a Monster", () => {
   assert.ok(b.pages[0].actors.includes(m.id));
 });
 
-test("planGame: always at least 2 levels, ends with celebrate, steps are valid", () => {
+// Was "≥2 levels, ends with celebrate": the old planner always added a closing fireworks level.
+// Every book is now mapped like the Mousie reference game, which ends on its last panels and
+// "The End" (no generic fireworks), and a book with no action still gets one run.
+test("planGame: at least 1 level, no generic fireworks, steps are valid", () => {
   // An empty story has nothing to play.
   assert.deepEqual(planGame(buildBook("")), []);
   const stories = [EXAMPLE_STORY, MOUSIE, "The cat sat.", "A.\n\nB.\n\nC.", "We fight.\n\nHooray!"];
@@ -148,17 +156,17 @@ test("planGame: always at least 2 levels, ends with celebrate, steps are valid",
     const b = buildBook(s);
     const plan = planGame(b);
     const lv = levels(plan);
-    assert.ok(lv.length >= 2, `≥2 levels for ${JSON.stringify(s)}`);
-    assert.equal(plan.at(-1).type, "level");
-    assert.equal(plan.at(-1).kind, "celebrate");
+    assert.ok(lv.length >= 1, `≥1 level for ${JSON.stringify(s)}`);
+    assert.ok(!lv.some((x) => x.kind === "celebrate"), "no generic fireworks");
     for (const st of plan) {
-      assert.ok(["story", "level"].includes(st.type));
+      assert.ok(["chapter", "story", "level"].includes(st.type));
       assert.ok(Number.isInteger(st.page) && st.page >= 0);
       if (b.pages.length) assert.ok(st.page < b.pages.length);
-      if (st.type === "level") assert.ok(ACTION_KEYS.includes(st.kind), st.kind);
+      if (st.type === "level") { assert.ok(ACTION_KEYS.includes(st.kind), st.kind); assert.match(st.title, /^Level \d+ · /); }
     }
-    assert.equal(plan.filter((x) => x.type === "story").length, b.pages.length, "every page is a story step");
+    assert.deepEqual(plan.filter((x) => x.type === "story").map((x) => x.page), b.pages.map((_, i) => i), "every page is a story step, in order");
   }
+  assert.ok(levels(planGame(buildBook("We fight.\n\nHooray!"))).some((x) => x.kind === "battle"));
 });
 
 test("planGame: no back-to-back repeats of the same level kind", () => {
@@ -180,8 +188,8 @@ test("MAX limits: pages, cast, levels", () => {
   const kinds = ["fight", "treasure", "climb", "walk", "friends", "fight", "treasure", "climb", "walk", "friends", "fight", "treasure"];
   const busy = buildBook(kinds.map((k, i) => `Line ${i}: we ${k}.`).join("\n\n"));
   const lv = levels(planGame(busy));
-  assert.ok(lv.length <= MAX_LEVELS + 1, `levels ${lv.length}`); // + the final celebration
-  assert.equal(lv.at(-1).kind, "celebrate");
+  assert.ok(lv.length >= 1 && lv.length <= MAX_LEVELS, `levels ${lv.length}`); // no closing celebration any more
+  assert.equal(lv.filter((x) => x.kind === "battle").length, 1, "one villain, one battle");
 });
 
 test("detectPlace / detectAction", () => {
@@ -197,7 +205,9 @@ test("\"Pip the bunny\" links Pip to the bunny character", () => {
   assert.ok(!byName(b, "Bunny"));
 });
 
-test("a story whose only action is a celebration still gets 2 levels", () => {
+// Was "still gets 2 levels" (a run plus the closing fireworks). Fireworks only come from a
+// child's own choice now, so a cheer-only story gets the one fallback run.
+test("a story whose only action is a celebration still gets a level, but no fireworks", () => {
   const lv = levels(planGame(buildBook("Hooray! The end.")));
-  assert.ok(lv.length >= 2, lv.map((s) => s.kind).join());
+  assert.deepEqual(lv.map((s) => s.kind), ["journey"]);
 });

@@ -1,9 +1,11 @@
-// The game: a book's comic pages play in order, and each action moment becomes a short level
-// with big buttons. Levels: journey, battle, collect, climb, friends, celebrate. No failure states.
+// The game: a book's comic panels play in order, in named chapters, and each action moment
+// becomes a short level with big buttons (the plan comes from story.js: mapComic, or a proposed
+// book.plan repaired by normalizePlan). Levels: journey, battle, collect, climb, friends,
+// celebrate. No failure states.
 import { h, show } from "./ui.js";
 import * as art from "./art.js";
 import { sfx, talk, say, stopSpeech, settings, setSetting, audio } from "./audio.js";
-import { PLACES, WEAPONS, ITEMS, ACTIONS, pickByWords } from "./catalog.js";
+import { PLACES, WEAPONS, ITEMS, ACTIONS, CAST_BY_KEY, pickByWords } from "./catalog.js";
 import { planGame } from "./story.js";
 
 const W = 960, H = 540;
@@ -20,6 +22,55 @@ const NOBODY = { id: "_hero", name: "Hero", emoji: "🧒", img: null, role: "her
 const SAFE_L = 130, SAFE_R = 830;
 
 const pageText = (p) => (p ? [p.narration || "", ...(p.lines || []).map((l) => l.text || "")].join(" ") : "");
+const GOAL_NAME = { forest: "the forest", cave: "the cave", beach: "the beach", ocean: "the sea", space: "space", city: "the city", castle: "the castle", sky: "the sky", desert: "the desert", snow: "the snow", home: "home", park: "the park" };
+// A sound for a sound word in the comic ("ROOR!", "BOOM!", "NEEE-NAW") or a line's sfx name.
+const SOUND_WORDS = [
+  [/^(r+o+a*r+|g+r+r*|rawr+|roar)/, "roar"], [/^(ka)?boo+m|^bang|^blast|^crash/, "boom"], [/^(v?roo+m|zoo+m|whoo+sh|swoo+sh)/, "zoom"],
+  [/^(chirp|twee+t|tweet)/, "chirp"], [/^(he(he)+|ha(ha)+|hihi|giggle)/, "hehe"], [/^(ne+e*naw|nee+|wee+woo|siren)/, "siren"],
+  [/^(ya+y|ya+h|hoo+ray|hurray|fanfare|tada)/, "fanfare"], [/^(squeak|eek+)/, "squeak"], [/^pop/, "pop"], [/^boing/, "boing"],
+  [/^(zap|pow|bam|whack|bonk)/, "hit"], [/^(woo+f|meo+w|moo+|oink|quack|ribbit)/, "boing"],
+];
+function soundOf(word) {
+  const w = String(word || "").toLowerCase().replace(/[^a-z]/g, "");
+  if (!w) return null;
+  if (typeof sfx[w] === "function" && w !== "note") return w;
+  for (const [re, name] of SOUND_WORDS) if (re.test(w)) return name;
+  return null;
+}
+const isSoundWord = (t) => { const w = String(t || "").trim(); return w.length > 1 && w.length <= 24 && w === w.toUpperCase() && /[A-Z]{2}/.test(w) && w.split(/[\s,!.-]+/).filter(Boolean).every((x) => soundOf(x)); };
+const FRIEND_SOUND = { lion: "zoom", tiger: "roar", firetruck: "siren", car: "zoom", rocket: "whistle", snake: "hehe", bird: "chirp", owl: "chirp", penguin: "squeak", mouse: "squeak", dog: "boing", cat: "squeak", monkey: "hehe", frog: "boing", horse: "zoom", unicorn: "cheer" };
+// Pictures cut out of the comic can be any shape; fit them in a box next to emoji of the same size.
+const trimCache = new WeakMap();
+function trimOf(img) {
+  if (trimCache.has(img)) return trimCache.get(img);
+  let box = { x: 0, y: 0, w: img.width, h: img.height, solid: true };
+  try {
+    const c = document.createElement("canvas");
+    const k = Math.min(1, 160 / Math.max(img.width, img.height));
+    c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+    const x = c.getContext("2d", { willReadFrequently: true });
+    x.drawImage(img, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let clear = 0;
+    for (let j = 3; j < d.length; j += 4) if (d[j] < 24) clear++;
+    const solid = clear < c.width * c.height * 0.02;
+    // No see-through background (a photo of a drawing): the corner colour is the paper around it.
+    const bg = [d[0], d[1], d[2]];
+    const empty = (o) => (solid ? Math.abs(d[o] - bg[0]) + Math.abs(d[o + 1] - bg[1]) + Math.abs(d[o + 2] - bg[2]) < 60 : d[o + 3] < 24);
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let i = 0; i < c.width; i++) {
+      if (empty((y * c.width + i) * 4)) continue;
+      if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    if (x1 >= x0 && y1 >= y0) {
+      const pad = solid ? 3 : 0;
+      x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(c.width - 1, x1 + pad); y1 = Math.min(c.height - 1, y1 + pad);
+      box = { x: x0 / k, y: y0 / k, w: (x1 - x0 + 1) / k, h: (y1 - y0 + 1) / k, solid };
+    }
+  } catch { /* a picture we can't read back: use all of it */ }
+  trimCache.set(img, box);
+  return box;
+}
 
 // Sprites for the cast. If pictures can't be loaded (e.g. the store is locked), fall back to emoji.
 async function getSprites(book) {
@@ -258,7 +309,25 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     ctx.fillStyle = color; ctx.fillText(text, x, y);
   }
   // Colour emoji take the alpha of the current fillStyle in some browsers, so reset it first.
-  const sprite = (s, x, y, size, o) => { ctx.fillStyle = "#000"; art.drawSprite(ctx, s, x, y, size, o); };
+  const sprite = (s, x, y, size, o = {}) => {
+    ctx.fillStyle = "#000";
+    if (!s || !s.img) { art.drawSprite(ctx, s, x, y, size, o); return; }
+    // A cut-out: trimmed to what's drawn, at most `size` tall and 1.5×size wide, standing on y.
+    const b = trimOf(s.img);
+    const k = Math.min((size * 0.92) / b.h, (size * 1.5) / b.w);
+    const w = b.w * k, hgt = b.h * k;
+    ctx.save();
+    ctx.translate(x, y);
+    if (o.rot) ctx.rotate(o.rot);
+    if (o.alpha !== undefined) ctx.globalAlpha = o.alpha;
+    if (s.flip !== !!o.faceLeft) ctx.scale(-1, 1);
+    ctx.drawImage(s.img, b.x, b.y, b.w, b.h, -w / 2, -hgt - size * 0.04, w, hgt);
+    if (b.solid) { // a square photo of a drawing: give it a sticker edge
+      ctx.lineWidth = 3; ctx.strokeStyle = INK;
+      ctx.beginPath(); ctx.roundRect(-w / 2, -hgt - size * 0.04, w, hgt, 8); ctx.stroke();
+    }
+    ctx.restore();
+  };
   const emo = (e, x, y, size, alpha = 1) => { ctx.fillStyle = "#000"; art.drawEmoji(ctx, e, x, y, size, alpha); };
   // Backgrounds come from art.js; isolate them so no canvas state (alpha, fonts) leaks into ours.
   function scene(place, scroll, t) { ctx.save(); art.drawScene(ctx, W, H, place, scroll, t); ctx.restore(); ctx.globalAlpha = 1; }
@@ -300,7 +369,8 @@ export async function playGame(book, { onExit, onFinish } = {}) {
   }
 
   /* ---------------- step flow ---------------- */
-  let stepIndex = -1, stars = 0, finished = false;
+  let stepIndex = -1, stars = 0, finished = false, chapter = "";
+  const chapterSteps = steps.filter((x) => x.type === "chapter");
   function resetStep() {
     epoch++;
     cancelTalk(); cancelTalk = () => {};
@@ -310,7 +380,7 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     parts = []; texts = []; shake = 0;
     helpEl.hidden = true;
     setOverlay(null);
-    root.classList.remove("g-story");
+    root.classList.remove("g-story", "g-chap");
     mode = null;
   }
   function goStep(i) {
@@ -318,10 +388,43 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     stepIndex = i;
     const st = steps[i];
     if (!st) return showEnd();
-    if (st.type === "story") startStory(st);
+    // The chapter in force: the last chapter card at or before this step (also after "Play again").
+    chapter = steps.slice(0, i + 1).filter((x) => x.type === "chapter").at(-1)?.title || "";
+    if (st.type === "chapter") startChapter(st);
+    else if (st.type === "story") startStory(st);
     else startLevel(st);
   }
   function next() { sfx.click(); goStep(stepIndex + 1); }
+
+  /* ---------------- chapter cards ---------------- */
+  // What a chapter is about, as a row of pictures: its villain, its friends, or its place.
+  function chapterIcons(i) {
+    const st = steps[i];
+    const until = steps.findIndex((x, k) => k > i && x.type === "chapter");
+    const inside = steps.slice(i + 1, until < 0 ? steps.length : until);
+    if (/home/i.test(st.title)) return "🏠";
+    const lv = inside.find((x) => x.type === "level" && (x.kind === "battle" || x.kind === "friends"));
+    if (lv?.kind === "battle") return villainOf(lv).emoji || "👾";
+    if (lv?.kind === "friends") return friendList(lv).map((f) => f.emoji).join(" ");
+    const P = PLACES[book.pages[st.page]?.place] || PLACES.forest;
+    return P.props.slice(0, 3).join(" ");
+  }
+  function startChapter(st) {
+    const k = chapterSteps.indexOf(st) + 1;
+    setLabel(`📖 ${st.title}`);
+    setOverlay([
+      h("p", { class: "g-chapno" }, `Chapter ${k}`),
+      h("h2", { class: "g-big g-chapter" }, st.title),
+      h("p", { class: "g-castrow", "aria-hidden": "true" }, chapterIcons(stepIndex)),
+    ]);
+    root.classList.add("g-chap");
+    setCaption("", `Chapter ${k}: ${st.title}`);
+    setControls([{ icon: "▶", label: "Next", color: "green", pulse: true, tap: true, keys: NEXT_KEYS, keyName: "space", fn: next }]);
+    mode = { update: () => {}, draw: () => {} };
+    sfx.cheer();
+    // A chapter card is a short pause in the story: it reads its title and turns by itself.
+    cancelTalk = talk({ role: "narrator", text: st.title }, () => later(() => goStep(stepIndex + 1), 1400));
+  }
 
   /* ---------------- story pages ---------------- */
   async function panelFor(i) {
@@ -331,21 +434,25 @@ export async function playGame(book, { onExit, onFinish } = {}) {
   async function startStory(st) {
     const my = epoch;
     const page = book.pages[st.page];
-    setLabel(`📖 Page ${st.page + 1} of ${book.pages.length}`);
+    setLabel(`📖 ${chapter ? chapter + " · " : ""}Page ${st.page + 1} of ${book.pages.length}`);
     root.classList.add("g-story"); // upright phones show the whole panel, not a crop
     setCaption("", "📖 …");
     setControls([]);
     const panel = await panelFor(st.page);
     if (!alive || my !== epoch) return;
     const lines = [];
-    if (page.narration) lines.push({ who: null, name: "", role: "narrator", text: page.narration });
+    if (page.narration) lines.push({ who: null, name: "", role: "narrator", text: page.narration, kind: "caption" });
     for (const l of page.lines || []) {
-      const c = sprites.get(l.who);
-      lines.push({ who: l.who, name: c?.name || "", role: c?.role || "friend", text: l.text || "" });
+      if (!l || !l.text) continue;
+      const c = l.who ? sprites.get(l.who) : null;
+      const kind = l.kind === "caption" || l.kind === "sfx" ? l.kind : "speech";
+      // A speaker we can't name (who: null) reads in the narrator's voice and shows no name.
+      lines.push({ who: c ? l.who : null, name: kind === "caption" ? "" : c?.name || "", role: c && kind !== "caption" ? c.role || "friend" : "narrator",
+        anon: !c, text: String(l.text), kind, sound: soundOf(l.sfx) || (kind === "sfx" || isSoundWord(l.text) ? soundOf(l.text) : null) });
     }
     const pos = new Map();
     if (!panel.photo) for (const a of art.layoutActors(page.actors || [], sprites, W, H)) pos.set(a.s.id, a);
-    const s = { t: 0, lines, cur: -1, done: false, panel, pos, page, narr: page.narration || "" };
+    const s = { t: 0, lines, cur: -1, done: false, panel, pos, page, narr: "", boom: null };
     mode = { update: (dt) => { s.t += dt; }, draw: () => drawStory(s) };
     s.btns = setControls([
       { icon: "🔁", label: "Again", color: "gray", tap: true, keys: ["r"], keyName: "R", fn: () => { sfx.click(); readFrom(s, 0); } },
@@ -367,6 +474,9 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     }
     s.cur = i;
     const l = s.lines[i];
+    if (l.kind === "caption") s.narr = l.text;
+    if (l.sound && settings.sound) sfx[l.sound]?.();
+    if (l.kind === "sfx") { s.boom = { text: l.text, t: s.t }; if (l.sound === "roar" || l.sound === "boom") shake = 10; }
     setCaption(l.name, l.text, ROLE_COLOR[l.role]);
     cancelTalk = talk({ role: l.role, text: l.text }, () => { if (my === epoch) later(() => readFrom(s, i + 1), 350); });
   }
@@ -376,7 +486,9 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     const l = s.lines[s.cur];
     let top = 14;
     if (s.narr && !up) top = drawNarration(s.narr) + 10;
-    if (!l || l.role === "narrator") return;
+    if (s.boom) drawBoom(s.boom.text, s.t - s.boom.t);
+    if (!l || l.kind === "caption" || l.kind === "sfx") return;
+    if (l.anon) { if (!up) drawStrip(l); return; }
     const a = s.pos.get(l.who);
     if (up) { if (a) drawMarker(a, s.t); return; }
     if (a) drawBubble(l, a, top);
@@ -411,6 +523,16 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     ctx.font = `bold ${f.size}px ${DISPLAY}`; ctx.fillStyle = INK;
     f.lines.forEach((ln, i) => ctx.fillText(ln, bx + bw / 2, by + 8 + nameH + f.lh * (i + 0.5)));
     ctx.textBaseline = "alphabetic";
+  }
+  // A sound word from the comic, big and wobbly across the picture.
+  function drawBoom(text, age) {
+    const pop = Math.min(1, age * 5);
+    const size = Math.min(130, Math.floor(1500 / Math.max(4, text.length))) * (0.6 + 0.4 * pop);
+    ctx.save();
+    ctx.translate(W / 2, H * 0.42);
+    ctx.rotate(-0.08 + Math.sin(age * 9) * 0.03);
+    outlined(text, 0, 0, size, "#ffd75e", "center");
+    ctx.restore();
   }
   function measureName(name) { ctx.font = `bold 20px ${DISPLAY}`; return ctx.measureText(String(name).toUpperCase()).width; }
   // A speaker we can't point at (a photo page): a speech strip along the bottom.
@@ -456,10 +578,44 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     }
     return out;
   }
-  function villainOf(page) {
+  // The level's own villain (a cast member, or one only named in the comic), else whoever is on the page.
+  function villainOf(st) {
+    if (st?.villain && sprites.get(st.villain)) return sprites.get(st.villain);
+    if (st?.villainKey || st?.villainEmoji) {
+      const cat = CAST_BY_KEY[st.villainKey];
+      return { id: "_v_" + (st.villainKey || "x"), name: st.villainName || cat?.label || "Monster", emoji: st.villainEmoji || cat?.emoji || "👾", img: null, role: "villain", big: !!(st.big ?? cat?.big), flip: cat?.faces === "left" };
+    }
+    const page = book.pages[st?.page];
     for (const id of page?.actors || []) { const s = sprites.get(id); if (s && s.role === "villain") return s; }
     return all.find((s) => s.role === "villain") || MONSTER;
   }
+  // Exactly the friends the level names (cast members, then guests only named in the comic).
+  function friendList(st) {
+    const out = [];
+    for (const id of st?.friends || []) { const f = sprites.get(id); if (f && !out.includes(f)) out.push(f); }
+    for (const g of st?.guests || []) {
+      const cat = CAST_BY_KEY[g.key];
+      out.push({ id: "_g_" + g.key, name: g.name || cat?.label || "Friend", emoji: g.emoji || cat?.emoji || "⭐", img: null, role: "friend", big: false, flip: cat?.faces === "left", kind: g.key });
+    }
+    return (out.length ? out : friendsOf(book.pages[st?.page])).slice(0, 4);
+  }
+  // Who comes along: the friend seen most on the last few panels before this level.
+  function sideOf(st) {
+    const score = new Map();
+    const from = Math.max(0, st.page - 6);
+    for (let i = from; i <= st.page && i < book.pages.length; i++) {
+      const p = book.pages[i];
+      const text = pageText(p).toLowerCase();
+      for (const f of all) {
+        if (f === hero || f.role === "villain") continue;
+        const there = (p.actors || []).includes(f.id) || (p.lines || []).some((l) => l?.who === f.id) || (f.name && text.includes(f.name.toLowerCase()));
+        if (there) score.set(f, (score.get(f) || 0) + 1 + (i - from) * 0.5); // later panels count more
+      }
+    }
+    const best = [...score].sort((a, b) => b[1] - a[1])[0];
+    return best ? best[0] : friendsOf(book.pages[st.page])[0] || null;
+  }
+  const kindOf = (f) => (book.cast || []).find((c) => c.id === f.id)?.kind || f.kind || null;
   const weaponOf = (page) => pickByWords(pageText(page), WEAPONS, null) || pickByWords(bookText, WEAPONS, "⭐");
   const itemOf = (page) => pickByWords(pageText(page), ITEMS, null) || pickByWords(bookText, ITEMS, "⭐");
   function progressBar(p, fromS, toEmoji) {
@@ -479,13 +635,43 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     ctx.fillStyle = "#d8453b"; ctx.beginPath(); ctx.roundRect(x - w / 2 + 3, y - 11, (w - 6) * Math.max(0, hp / max), 16, 8); ctx.fill();
   }
 
+  // Where a run ends: a cave mouth, home, or the place's own landmark.
+  function drawGoal(to, e, x) {
+    if (to === "cave") {
+      ctx.fillStyle = "#8a7a6a"; ctx.strokeStyle = INK; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(x, G, 170, 230, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#1e1814"; ctx.beginPath(); ctx.ellipse(x, G, 95, 160, 0, Math.PI, 0); ctx.fill();
+      outlined("CAVE", x, G - 186, 28, "#fff", "center");
+      return;
+    }
+    emo(e, x, G - 90, 190);
+    if (to === "home") outlined("HOME", x, G - 196, 28, "#fff", "center");
+  }
+  // A treehouse at the top of the ladder, like the one in Mousie.
+  function drawTreehouse(top) {
+    ctx.fillStyle = "#7a5534"; ctx.strokeStyle = INK; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(600, H); ctx.lineTo(630, top - 40); ctx.lineTo(760, top - 40); ctx.lineTo(800, H); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#3f8a3a";
+    for (const [x, y] of [[560, 40], [690, 10], [830, 40], [470, 70], [900, 100]]) { ctx.beginPath(); ctx.arc(x, y, 90, 0, 7); ctx.fill(); }
+    const poly = (pts, fill) => { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke(); };
+    poly([420, top, 800, top, 800, top + 18, 420, top + 18], "#8a5a2b");
+    poly([450, top, 450, top - 92, 770, top - 92, 770, top], "#c58a4f");
+    poly([430, top - 86, 610, top - 170, 790, top - 86], "#a0522d");
+    poly([500, top - 70, 540, top - 70, 540, top - 30, 500, top - 30], "#bfe3f5");
+    poly([680, top - 70, 720, top - 70, 720, top - 30, 680, top - 30], "#bfe3f5");
+    poly([588, top - 62, 632, top - 62, 632, top, 588, top], "#6b4423");
+    ctx.font = `bold 17px ${DISPLAY}`; ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.fillText("TREE HOUSE", 610, top - 76);
+  }
+
   const LEVELS = {
     journey: {
       help: (s) => `Press JUMP to hop over things on the way. Grab the ${s.itemName}!`,
       init(s) {
+        const to = PLACES[s.st.to] ? s.st.to : s.place;
         Object.assign(s, { dist: 0, goal: 6000, speed: 280, my: 0, vy: 0, jumps: 0, stun: 0, obs: [], items: [], nextObs: 1.5, nextItem: 0.8, goalX: null, got: 0, hist: [],
-          side: friendsOf(s.page)[0] || null, item: itemOf(s.page), P: PLACES[s.place] });
+          side: sideOf(s.st), item: itemOf(s.page), P: PLACES[s.place], to, goalE: PLACES[to].goal });
         s.itemName = s.item === "⭐" ? "stars" : "treats";
+        s.winMsg = to === "home" ? "We made it home!" : to !== s.place ? `We found ${GOAL_NAME[to] || "it"}!` : "We made it!";
       },
       controls: (s) => [{ icon: "⬆️", label: "JUMP", color: "orange", keys: [" ", "Enter", "ArrowUp", "j"], keyName: "space", fn: () => {
         if (s.won || s.jumps >= 2) return;
@@ -527,12 +713,12 @@ export async function playGame(book, { onExit, onFinish } = {}) {
         if (left < 1000) s.goalX = 290 + left;
         if (s.goalX !== null && s.goalX <= 330 && !s.won) {
           sparkle(s.goalX, G - 120, 10);
-          levelWon(s, "We made it!");
+          levelWon(s, s.winMsg);
         }
       },
       draw(s) {
         scene(s.place, s.dist, s.t);
-        if (s.goalX !== null) emo(s.P.goal, s.goalX + 40, G - 90, 190);
+        if (s.goalX !== null) drawGoal(s.to, s.goalE, s.goalX + 40);
         for (const it of s.items) emo(s.item, it.x, it.y + Math.sin(s.t * 4 + it.x * 0.02) * 5, 48);
         for (const o of s.obs) emojiAt(o.e, o.x, G - 28 + o.dy, 64, o.rot);
         const running = s.my === 0 && !s.won;
@@ -542,23 +728,28 @@ export async function playGame(book, { onExit, onFinish } = {}) {
         }
         const bob = running ? Math.abs(Math.sin(s.t * 12)) * 7 : 0;
         sprite(hero, 220, G + 4 + s.my - bob, 120, { rot: s.stun > 0 ? Math.sin(s.t * 30) * 0.15 : 0 });
-        progressBar(s.dist / s.goal, hero, s.P.goal);
+        progressBar(s.dist / s.goal, hero, s.goalE);
         outlined(`${s.got}`, SAFE_L + 56, 108, 34, "#ffd75e");
         emo(s.item, SAFE_L + 24, 96, 36);
       },
     },
 
     battle: {
-      help: (s) => `Press ATTACK to throw ${WEAPON_NAMES[s.weapon] || "magic"} at the ${s.V.name}! When SUPER is ready, press it for a big blast!`,
+      help: (s) => s.bomb
+        ? `Shoot ${s.attack}S at the ${s.V.name}, and press BOMB when it's ready. BOOM!`
+        : `Press ${s.attack} to throw ${WEAPON_NAMES[s.weapon] || "magic"} at the ${s.V.name}! When SUPER is ready, press it for a big blast!`,
       init(s) {
-        const V = villainOf(s.page);
-        const big = !!V.big;
+        const V = villainOf(s.st);
+        const big = !!(s.st.big ?? V.big);
+        const weapon = s.st.weapon || weaponOf(s.page);
         Object.assign(s, { V, big, size: big ? 260 : 170, max: big ? 36 : 24, hurt: 0, cool: 0, charge: 0.5, shots: [], supers: [], dead: false, flop: 0,
-          rx: W + 120, roar: 0, nextRoar: 2.5, my: 0, vy: 0, turn: 0, side: friendsOf(s.page)[0] || null, weapon: weaponOf(s.page) });
+          rx: W + 120, roar: 0, nextRoar: 2.5, my: 0, vy: 0, turn: 0, side: sideOf(s.st), weapon,
+          bomb: s.st.superWeapon === "💣", superIcon: s.st.superWeapon || "💥", attack: weapon === "🏹" ? "ARROW" : "ATTACK",
+          vname: s.st.name || V.name, roarText: /\broo+r/i.test(bookText) ? "ROOR!" : "ROAR!" });
         s.hp = s.max;
       },
       controls: (s) => [
-        { icon: s.weapon, label: "ATTACK", color: "blue", keys: [" ", "Enter", "a"], keyName: "space", fn: () => {
+        { icon: s.weapon, label: s.attack, color: "blue", keys: [" ", "Enter", "a"], keyName: "space", fn: () => {
           if (s.dead || s.cool > 0) return;
           s.cool = 0.22; sfx.shoot();
           const fromSide = s.side && s.turn++ % 2 === 1;
@@ -566,7 +757,7 @@ export async function playGame(book, { onExit, onFinish } = {}) {
           const d = Math.hypot(tx - bx, ty - by) || 1;
           s.shots.push({ x: bx, y: by, vx: (tx - bx) / d * 950, vy: (ty - by) / d * 950, rot: 0 });
         } },
-        { icon: "💥", label: "SUPER", color: "red", charge: true, keys: ["s", "b"], keyName: "S", fn: () => {
+        { icon: s.superIcon, label: s.bomb ? "BOMB" : "SUPER", color: "red", charge: true, keys: ["s", "b"], keyName: s.bomb ? "B" : "S", fn: () => {
           if (s.dead || s.charge < 1) return;
           s.charge = 0; sfx.whistle();
           const T = 0.95, x0 = 240, y0 = G - 90, x1 = s.rx - 20, y1 = G - s.size * 0.5, g = 1200;
@@ -589,7 +780,7 @@ export async function playGame(book, { onExit, onFinish } = {}) {
           if (s.big) {
             const home = 720 + Math.sin(s.t * 0.9) * 30;
             s.rx = s.rx > home + 5 ? s.rx - 260 * dt : home;
-            if ((s.nextRoar -= dt) <= 0) { s.nextRoar = 5 + Math.random() * 2; s.roar = 1; sfx.roar(); shake = 12; addText("ROAR!", Math.min(SAFE_R - 80, s.rx), 130, "#f0a040", 64, 1.2); }
+            if ((s.nextRoar -= dt) <= 0) { s.nextRoar = 5 + Math.random() * 2; s.roar = 1; sfx.roar(); shake = 12; addText(s.roarText, Math.min(SAFE_R - 80, s.rx), 130, "#f0a040", 64, 1.2); }
           } else {
             s.rx -= (s.rx > W ? 260 : 50) * dt;
             if (s.rx < 430) { s.rx += 220; s.vy = -600; sfx.squeak(); addText("Eek!", 220, G - 170, "#fff", 40); }
@@ -607,7 +798,7 @@ export async function playGame(book, { onExit, onFinish } = {}) {
             burst(s.rx, G - s.size * 0.5, 70, PARTY, 520, 8, 1.3);
             sparkle(s.rx, G - s.size * 0.6, 10);
             addText(s.big ? "BOOM!" : "POW!", W / 2, 280, "#ffd75e", 100, 2);
-            later(() => levelWon(s, "Hooray! You won!"), 1500);
+            later(() => levelWon(s, s.big ? "We won the day!" : "Hooray! You won!"), 1500);
           }
         };
         for (const a of s.shots) {
@@ -644,15 +835,15 @@ export async function playGame(book, { onExit, onFinish } = {}) {
         if (s.side) sprite(s.side, 330, G + 4 - Math.abs(Math.sin(s.t * 3)) * 6, 100);
         sprite(hero, 220, G + 4 + s.my, 120);
         for (const a of s.shots) emojiAt(s.weapon, a.x, a.y, 52, a.rot);
-        for (const b of s.supers) emojiAt(s.weapon, b.x, b.y, 110, b.rot);
-        if (!s.dead) hpBar(s.rx, G + 58, s.hp, s.max, s.V.name);
+        for (const b of s.supers) emojiAt(s.superIcon === "💥" ? s.weapon : s.superIcon, b.x, b.y, 110, b.rot);
+        if (!s.dead) hpBar(s.rx, G + 58, s.hp, s.max, s.vname);
       },
     },
 
     collect: {
       help: (s) => `Move with the arrow buttons, or drag your finger, to catch ${s.goalN} falling ${s.item === "⭐" ? "stars" : "treasures"}!`,
       init(s) {
-        Object.assign(s, { x: 480, dir: 0, target: null, items: [], next: 0.4, got: 0, goalN: 10, face: false, sx: 360, side: friendsOf(s.page)[0] || null, item: itemOf(s.page) });
+        Object.assign(s, { x: 480, dir: 0, target: null, items: [], next: 0.4, got: 0, goalN: 10, face: false, sx: 360, side: sideOf(s.st), item: s.st.item || itemOf(s.page) });
       },
       controls: (s) => [
         { icon: "◀", label: "Left", color: "blue", hold: true, keys: ["ArrowLeft", "a"], keyName: "←", fn: (on) => { if (on) { s.dir = -1; s.target = null; } else if (s.dir === -1) s.dir = 0; } },
@@ -694,17 +885,19 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     },
 
     climb: {
-      help: () => "Press CLIMB to go up the ladder, step by step!",
+      help: (s) => s.home === "treehouse" ? "Press CLIMB to go up the ladder to the treehouse!" : s.toHome ? "Press CLIMB to go up the ladder, all the way home!" : "Press CLIMB to go up the ladder, step by step!",
       init(s) {
         const P = PLACES[s.place];
-        Object.assign(s, { rung: 0, total: 10, y: G, ty: G, hx: 480, top: 196, goal: P?.goal || "🏠", side: friendsOf(s.page)[0] || null, cheer: 0 });
+        const toHome = s.st.to === "home";
+        const home = toHome ? (s.st.home || "treehouse") : null;
+        Object.assign(s, { rung: 0, total: 10, y: G, ty: G, hx: 480, top: 196, goal: home === "tower" ? "🏰" : toHome ? "🏠" : P?.goal || "🏠", home, toHome, side: sideOf(s.st), cheer: 0 });
         s.step = (G - s.top) / s.total;
       },
       controls: (s) => [{ icon: "🪜", label: "CLIMB", color: "green", keys: [" ", "Enter", "ArrowUp", "c"], keyName: "space", fn: () => {
         if (s.won || s.rung >= s.total) return;
         sfx.note(s.rung); s.rung++; s.ty = G - s.rung * s.step; s.cheer = 0.5;
         addText(String(s.rung), 560, s.ty - 70, "#ffd75e", 40, 0.8);
-        if (s.rung >= s.total) later(() => { s.hx = 570; burst(640, 150, 70, PARTY, 500, 7, 1.5); sparkle(620, 140, 10); levelWon(s, "We made it to the top!"); }, 400);
+        if (s.rung >= s.total) later(() => { s.hx = 570; burst(640, 150, 70, PARTY, 500, 7, 1.5); sparkle(620, 140, 10); levelWon(s, s.toHome ? "We made it home!" : "We made it to the top!"); }, 400);
       } }],
       update(s, dt) {
         s.y += (s.ty - s.y) * Math.min(1, dt * 10);
@@ -713,10 +906,13 @@ export async function playGame(book, { onExit, onFinish } = {}) {
       },
       draw(s) {
         scene(s.place, 0, s.t);
-        // The goal sits on a ledge at the top of the ladder.
-        ctx.fillStyle = "#a0703f"; ctx.strokeStyle = INK; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.roundRect(420, s.top, 360, 22, 8); ctx.fill(); ctx.stroke();
-        emo(s.goal, 705, s.top - 66, 140);
+        if (s.home === "treehouse") drawTreehouse(s.top);
+        else {
+          // The goal sits on a ledge at the top of the ladder.
+          ctx.fillStyle = "#a0703f"; ctx.strokeStyle = INK; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.roundRect(420, s.top, 360, 22, 8); ctx.fill(); ctx.stroke();
+          emo(s.goal, 705, s.top - 66, 140);
+        }
         ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 8; ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(445, G + 6); ctx.lineTo(445, s.top); ctx.moveTo(515, G + 6); ctx.lineTo(515, s.top); ctx.stroke();
         ctx.lineWidth = 6;
@@ -732,7 +928,7 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     friends: {
       help: () => "Press every friend's button to play together!",
       init(s) {
-        let list = friendsOf(s.page).slice(0, 4);
+        let list = friendList(s.st);
         if (!list.length) list = [hero];
         Object.assign(s, { list, done: new Set(), runs: [], dance: 0 });
       },
@@ -740,7 +936,7 @@ export async function playGame(book, { onExit, onFinish } = {}) {
         icon: f.emoji, label: f.name, color: ["orange", "blue", "green", "red"][i % 4], keys: [String(i + 1)], keyName: String(i + 1), fn: () => {
           if (s.runs.some((r) => r.f === f)) return;
           s.runs.push({ f, x: -120, i });
-          [sfx.zoom, sfx.chirp, sfx.hehe, sfx.boing][i % 4]();
+          (sfx[FRIEND_SOUND[kindOf(f)]] || [sfx.zoom, sfx.chirp, sfx.hehe, sfx.boing][i % 4])();
           addText(`${f.name}!`, W / 2, 140, "#ffd75e", 52, 1.4);
           s.dance = 1.6;
           if (!s.done.has(f)) { s.done.add(f); if (s.done.size === s.list.length) later(() => levelWon(s, "You played with everyone!", { keep: true }), 700); }
@@ -810,10 +1006,15 @@ export async function playGame(book, { onExit, onFinish } = {}) {
     const kind = LEVELS[st.kind] ? st.kind : "journey";
     const L = LEVELS[kind];
     const page = book.pages[st.page] || book.pages[0];
-    const s = { kind, t: 0, won: false, page, place: PLACES[page?.place] ? page.place : "forest" };
+    const place = PLACES[st.from] ? st.from : PLACES[page?.place] ? page.place : "forest";
+    const s = { kind, t: 0, won: false, st, page, place };
     L.init(s);
     const n = steps.slice(0, stepIndex + 1).filter((x) => x.type === "level").length;
-    setLabel(`${ACTIONS[kind]?.icon || "⭐"} Level ${n}: ${ACTIONS[kind]?.label || kind}`);
+    const title = typeof st.title === "string" && st.title.trim() ? st.title.trim() : `Level ${n} · ${ACTIONS[kind]?.label || kind}`;
+    setLabel(`${ACTIONS[kind]?.icon || "⭐"} ${title}`);
+    // The level's name, big across the picture for a moment.
+    ctx.font = `bold 56px ${DISPLAY}`;
+    addText(title, W / 2, 130, "#fff", Math.min(56, Math.floor(56 * 760 / Math.max(1, ctx.measureText(title).width))), 2.4, 8);
     s.btns = setControls(L.controls(s));
     mode = {
       update: (dt) => { s.t += dt; L.update(s, dt); },

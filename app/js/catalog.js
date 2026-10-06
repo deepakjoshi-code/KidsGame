@@ -97,7 +97,24 @@ export const ITEMS = [
   { emoji: "💰", words: ["treasure"] },
 ];
 
-export const AVATARS = ["🦊", "🐼", "🐨", "🐯", "🦁", "🐸", "🐵", "🦄", "🐲", "🐙", "🦖", "🐬", "🐧", "🐰", "🐻", "🐱"];
+// Bad guys a comic may name without them being in the cast ("a pirate ship", "the beast").
+export const EXTRA_VILLAINS = [
+  { key: "pirate", emoji: "🏴‍☠️", label: "Pirate", words: ["pirate", "pirates"], faces: "front", villain: true },
+  { key: "beast", emoji: "👾", label: "Monster", words: ["beast", "creature", "baddie", "villain", "bad guy", "bad guys"], faces: "front", villain: true },
+];
+// How a game names a chapter set in a place, and a run through it.
+export const PLACE_CHAPTER = {
+  forest: "In the forest", cave: "The cave", beach: "At the beach", ocean: "Under the sea", space: "Into space",
+  city: "In the city", castle: "The castle", sky: "Up in the sky", desert: "In the desert", snow: "In the snow",
+  home: "At home", park: "At the park",
+};
+export const PLACE_RUN = {
+  forest: "Forest Run", cave: "Cave Run", beach: "Beach Run", ocean: "Sea Swim", space: "Space Flight",
+  city: "City Run", castle: "Castle Run", sky: "Sky Flight", desert: "Desert Run", snow: "Snow Run",
+  home: "Run Home", park: "Park Run",
+};
+
+export const AVATARS =["🦊", "🐼", "🐨", "🐯", "🦁", "🐸", "🐵", "🦄", "🐲", "🐙", "🦖", "🐬", "🐧", "🐰", "🐻", "🐱"];
 export const COLORS = ["#f0a040", "#5f9e45", "#3d7fd6", "#d8453b", "#9a5fc0", "#e0679a"];
 // Picture lock choices for a child profile.
 export const LOCK_PICS = ["🍎", "🚗", "🐶", "⭐", "🌈", "🎈", "🍕", "🐠", "⚽"];

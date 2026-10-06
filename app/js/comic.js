@@ -148,12 +148,12 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
   let speech = []; // { role, text } in read-aloud order
 
   function bubble(line) {
-    const c = castById.get(line.who);
-    const role = c?.role || "friend";
+    const c = line.who ? castById.get(line.who) : null;
+    const role = c?.role || (line.who ? "friend" : "narrator"); // who: null = someone we can't name
     const text = String(line.text || "");
     const shout = /[A-Z]{2}/.test(text) && text === text.toUpperCase() && text.length < 40;
     return h("div", { class: `comic-bubble role-${role}${shout ? " shout" : ""}`, dataset: { who: line.who || "" } },
-      h("span", { class: "comic-who" }, c ? `${c.emoji} ${c.name}` : "Someone"),
+      c ? h("span", { class: "comic-who" }, `${c.emoji} ${c.name}`) : null,
       h("span", { class: "comic-text" }, text));
   }
   function talkFor(page) {
@@ -162,7 +162,7 @@ export async function showComic(book, { onBack, onPlay, onEdit } = {}) {
     talkEls = [caption, ...bubbles].filter(Boolean);
     speech = [];
     if (page.narration) speech.push({ role: "narrator", text: page.narration });
-    for (const l of (page.lines || []).filter((x) => x && x.text)) speech.push({ role: castById.get(l.who)?.role || "friend", text: String(l.text) });
+    for (const l of (page.lines || []).filter((x) => x && x.text)) speech.push({ role: l.who ? castById.get(l.who)?.role || "friend" : "narrator", text: String(l.text) });
     return h("div", { class: "comic-talk" }, caption, h("div", { class: "comic-bubbles" }, bubbles));
   }
 
@@ -544,7 +544,7 @@ export async function exportBookPack(book) {
   for (const [i, p] of (book.pages || []).entries()) {
     pages.push({
       id: "p" + (i + 1), imageId: await pic(p.imageId), place: p.place, narration: String(p.narration || ""),
-      lines: (p.lines || []).filter((l) => castIds.has(l.who)).map((l) => ({ who: castIds.get(l.who), text: String(l.text || "") })),
+      lines: (p.lines || []).filter((l) => l && (l.who === null || l.who === undefined || castIds.has(l.who))).map((l) => ({ who: l.who ? castIds.get(l.who) : null, text: String(l.text || "") })),
       actors: (p.actors || []).filter((a) => castIds.has(a)).map((a) => castIds.get(a)),
       action: p.action || "none",
     });
@@ -682,7 +682,7 @@ export function validatePack(data) {
     const lines = (p.lines === undefined ? [] : arr(p.lines, 30, `${what}'s speech`)).map((l) => {
       if (!isObj(l)) fail(BROKEN);
       onlyKeys(l, ["who", "text"], `${what}'s speech`);
-      if (typeof l.who !== "string" || !ids.has(l.who)) fail(`${what} has someone talking who isn't in the cast.`);
+      if (l.who !== null && (typeof l.who !== "string" || !ids.has(l.who))) fail(`${what} has someone talking who isn't in the cast.`);
       return { who: l.who, text: str(l.text, MAX_STR, `Something said on ${what.toLowerCase()}`) };
     }).filter((l) => l.text);
     const actors = [];
@@ -730,7 +730,7 @@ export async function importBookPack(text, profileId) {
       cast: v.cast.map((c) => ({ ...c, id: castMap.get(c.id), imageId: img(c.imageId, "sprite") })),
       pages: v.pages.map((p) => ({
         ...p, id: newId(), imageId: img(p.imageId, "page"),
-        lines: p.lines.map((l) => ({ who: castMap.get(l.who), text: l.text })),
+        lines: p.lines.map((l) => ({ who: l.who === null ? null : castMap.get(l.who), text: l.text })),
         actors: p.actors.map((a) => castMap.get(a)),
       })),
     };

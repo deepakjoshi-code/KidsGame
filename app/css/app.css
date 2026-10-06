@@ -631,3 +631,31 @@ body.fb-dragging .fb-choices { opacity: 0.6; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Claude AI: Grown-ups settings and the automatic "making your game" screen ---------- */
+.ai-head { align-items: center; justify-content: space-between; gap: 10px; }
+.ai-head h2 { margin: 0; }
+.ai-facts { margin: 0; padding-left: 1.2em; }
+.ai-facts li + li { margin-top: 6px; }
+.ai-consent { display: flex; gap: 12px; align-items: flex-start; font-weight: 600; cursor: pointer; }
+.ai-consent.small { font-weight: 400; align-items: center; }
+.ai-check { width: 28px; height: 28px; flex: none; margin: 0; accent-color: var(--leaf); }
+.ai-consent.small .ai-check { width: 22px; height: 22px; }
+.ai-advanced summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.ai-advanced[open] summary { margin-bottom: 8px; }
+.ai-switch { width: 100%; }
+.ai-result { min-height: 1.4em; margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.ai-result.good { color: var(--leaf-dark); }
+.ai-result.bad { color: var(--berry); }
+.aiw h2 { margin: 0; }
+.aiw-stages { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; text-align: left; }
+.aiw-stage { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 2px solid var(--paper-3); border-radius: var(--radius-sm); background: #fff; color: var(--ink-soft); font-family: var(--display); font-size: 1.1rem; }
+.aiw-ico { font-size: 1.6rem; line-height: 1; flex: none; }
+.aiw-text { flex: 1; min-width: 0; }
+.aiw-tick { flex: none; width: 1.4em; text-align: center; font-weight: 700; }
+.aiw-stage.active { border-color: var(--ink); background: var(--sun-soft); color: var(--ink); }
+.aiw-stage.active .aiw-ico { animation: bounce 1.2s ease-in-out infinite; }
+.aiw-stage.done { border-color: var(--leaf); color: var(--ink); }
+.aiw-stage.done .aiw-tick::before { content: "✓"; color: var(--leaf-dark); }
+.aiw-note { background: var(--sun-soft); border: 2px solid var(--ink); border-radius: var(--radius-sm); padding: 10px 14px; text-align: left; font-weight: 600; }
+.aiw-tip { color: var(--ink-soft); margin: 4px 0 0; text-align: left; }

@@ -46,7 +46,27 @@ hand. Wish Circle makes that possible for any child's book, privately, on the fa
   (`.wishbook`), auto-lock, erase everything, and a plain-language privacy explainer.
 - Installable PWA for iPhone, iPad and Mac. Works offline after the first visit.
 
-Not in the MVP: accounts, cloud sync, any network feature, handwriting recognition, AI.
+Not in the MVP: accounts, cloud sync, handwriting recognition. (Since then: the opt-in Claude AI
+comic reader above, the one network feature, parent-consented and off by default.)
+
+## Comic → game with Claude (opt-in)
+
+A child who already made a comic (a PDF or photos of the pages) gets a game from it **fully
+automatically**: pick the files, watch one friendly progress screen ("Reading your comic…
+Finding your characters… Building your game…", with Cancel), and the game starts. No review step,
+no picking characters, no choosing levels. The comic reader and the editor are on the shelf
+afterwards for anyone who wants to change something.
+
+- **With Claude AI on** (Grown-ups, off by default): Claude reads the whole comic once and writes
+  down every bubble, caption and sound word with its speaker, the cast (names as written, hero,
+  friends, villains), where each panel happens, the chapters and the levels, following the same
+  rules as the parent's hand-made "Mousie" game: a run when they set off, one battle per villain
+  right after they decide to fight (with the story's weapons, a charged bomb when bombs come up),
+  a parade with each new friend, a climb or run home before the last panels, no generic fireworks,
+  and no way to lose. The characters are cut out of the child's own drawings for the game.
+- **With it off, or if it can't help:** still automatic. Each panel becomes a page, the game comes
+  from the on-device rule-based plan with emoji characters, and the parent is told that turning on
+  Claude AI gives a much better game.
 
 ## Principles
 

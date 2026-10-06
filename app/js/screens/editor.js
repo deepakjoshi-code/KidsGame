@@ -316,7 +316,11 @@ function reviewStep(ed) {
     b.title = (b.title || "").trim() || "My Story";
     b.author = (b.author || "").trim();
     for (const p of b.pages) p.lines = p.lines.filter((l) => l.text.trim());
-    b.cover = b.pages[0]?.imageId || null;
+    // A separate cover picture (e.g. a comic's cover page) stays; otherwise page 1 is the cover.
+    const pageImages = new Set(b.pages.map((p) => p.imageId).filter(Boolean));
+    if (!b.cover || pageImages.has(b.cover) || !(ed.original && b.cover === ed.original.cover)) b.cover = b.pages[0]?.imageId || null;
+    // A saved game plan points at pages by position; if pages were added, removed or moved, plan again from the story.
+    if (b.plan && ed.original && b.pages.map((p) => p.id).join() !== (ed.original.pages || []).map((p) => p.id).join()) delete b.plan;
     await busy(btn, "Saving…", async () => {
       const saved = await store.save({ ...b, kind: "book", profileId: ed.profile.id, stars: b.stars || 0, plays: b.plays || 0 });
       // Drop images this book no longer uses (replaced photos, removed drawings).

@@ -1,0 +1,22 @@
+{
+  "name": "wish-circle-comic-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wish Circle: a small Cloudflare Worker that asks Claude to read a child's comic and plan its game.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:mock": "wrangler dev --var MOCK:1",
+    "deploy": "wrangler deploy",
+    "test": "node --test ../app/tests/worker.test.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.147.0"
+  }
+}

@@ -18,3 +18,9 @@ jobs:
       - name: Unit, security-lint and precache tests
         working-directory: app
         run: node --test tests/*.test.mjs
+      - name: Worker dependencies
+        working-directory: worker
+        run: npm ci
+      - name: Worker and AI tests (with the worker's SDK installed)
+        working-directory: app
+        run: node --test tests/worker.test.mjs tests/ai.test.mjs
