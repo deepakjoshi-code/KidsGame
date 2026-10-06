@@ -156,10 +156,6 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   <main id="stage">
     <canvas id="cv" width="960" height="540"></canvas>
     <div id="help" hidden></div>
-    <div id="story" class="overlay" hidden>
-      <img id="storyImg" alt="">
-      <div class="bubbles" id="bubbles"></div>
-    </div>
     <div id="title" class="overlay">
       <img src="__ART_cover__" alt="Mousie walking on a green path">
       <h1 class="big-title">Mousie</h1>
@@ -178,7 +174,6 @@ canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 <script>
 "use strict";
-const ART = __ART_JSON__;
 const W = 960, H = 540, GROUND = 455;
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -283,33 +278,18 @@ function say(text) { speakLines([["Narrator", text]]); }
 
 /* ---------------- the story ---------------- */
 const STEPS = [
-  { story: "daddy1", ch: "At home", lines: [["Mousie", "Hi Daddy. Can I go on an adventure with Birdie?"]] },
-  { story: "daddy2", ch: "At home", lines: [["Daddy", "Ok."]] },
-  { story: "hibirdie", ch: "In the forest", lines: [["Birdie", "Hi Mousie!", "chirp"]] },
-  { story: "adventure", ch: "In the forest", lines: [["Mousie", "We're going on an adventure!"]] },
+  { scene: "home", ch: "At home" },
+  { scene: "jungle", ch: "Into the jungle" },
   { level: "run", ch: "Level 1 · Forest Run" },
-  { story: "cave", ch: "The cave", lines: [["Mousie", "Look! A cave!"], ["Birdie", "Let's go inside!"]] },
-  { story: "inside", ch: "The cave", lines: [["Narrator", "Mousie and Birdie tiptoe into the dark cave."]] },
-  { story: "raptor", ch: "The cave", lines: [["Birdie", "Look, a Velociraptor!"], ["Mousie", "Oh no! What do we do?"]] },
-  { story: "fight", ch: "The cave", lines: [["Birdie", "I think we should fight it."], ["Mousie", "Ok."]] },
+  { scene: "cave", ch: "The cave" },
   { level: "raptor", ch: "Level 2 · Velociraptor" },
-  { story: "arrows", ch: "The cave", lines: [["Birdie", "Good, I took the arrows and fight!"]] },
-  { story: "trexcame", ch: "The cave", lines: [["Birdie", "Hooray, Velociraptor died!"], ["T-Rex", "ROOR!", "roar"], ["Mousie", "Are you sure hooray? T-Rex came!"]] },
-  { story: "trex", ch: "The Mighty T-Rex", lines: [["T-Rex", "ROOR!", "roar"], ["Mousie", "Let's fight it!"]] },
-  { story: "bombarrows", ch: "The Mighty T-Rex", lines: [["Birdie", "Ok, let's fight it with bombs and arrows!"]] },
-  { story: "bigbomb", ch: "The Mighty T-Rex", lines: [["Mousie", "Look how big the bomb is! Let's do it!"]] },
+  { scene: "trex", ch: "The Mighty T-Rex" },
   { level: "trex", ch: "Level 3 · The Mighty T-Rex" },
-  { story: "boom", ch: "The Mighty T-Rex", lines: [["Narrator", "BOOM!", "boom"], ["Mousie", "We won the day!"]] },
-  { story: "snake1", ch: "A new friend", lines: [["Mousie", "Hi Snake!! Why are you here??"]] },
-  { story: "snake2", ch: "A new friend", lines: [["Snake", "Your daddy sent me to see if you need any help."]] },
-  { story: "lion1", ch: "A new friend", lines: [["Snake", "Guys!! Look at my pet lion!"]] },
-  { story: "lion2", ch: "A new friend", lines: [["Lion", "ZOOOOM!", "zoom"]] },
-  { story: "truck1", ch: "A new friend", lines: [["Snake", "Guys!! Look at my fire truck!!"]] },
-  { story: "truck2", ch: "A new friend", lines: [["Fire truck", "NEEE-NAW, NEEE-NAW!", "siren"]] },
+  { scene: "friends", ch: "A new friend" },
   { level: "parade", ch: "Level 4 · Play with Friends" },
-  { story: "yah", ch: "Time to go home", lines: [["Everyone", "YAH!", "fanfare"], ["Mousie", "OK!!"], ["Birdie", "Let's go home!!"], ["Snake", "Hehe", "hehe"]] },
+  { scene: "gohome", ch: "Time to go home" },
   { level: "climb", ch: "Level 5 · Climb Home" },
-  { story: "treehouse", ch: "Home!", lines: [["Mousie", "It's perfect! Safe and wonderful."], ["Birdie", "Hooray! We made it!", "fanfare"]] },
+  { scene: "treehouse", ch: "Home!" },
   { end: true, ch: "The End" },
 ];
 
@@ -347,42 +327,160 @@ const game = { step: -1, cheese: 0, stars: 0 };
 let scene = null; // active level
 
 function showOnly(id) {
-  ["story", "title", "end"].forEach((k) => ($(k).hidden = k !== id));
+  ["title", "end"].forEach((k) => ($(k).hidden = k !== id));
   $("help").hidden = true;
 }
 function goTitle() {
-  stopSpeech(); scene = null; game.step = -1; game.cheese = 0; game.stars = 0;
+  stopSpeech(); scene = null; cut = null; game.step = -1; game.cheese = 0; game.stars = 0;
   showOnly("title"); $("chapter").textContent = "The Adventure Game";
   setControls([{ icon: "▶", label: "Play!", color: "green", pulse: true, tap: true, keys: NEXT_KEYS, keyName: "space", fn: () => goStep(0) }]);
 }
 function next() { sfx.click(); goStep(game.step + 1); }
 function goStep(i) {
-  stopSpeech(); scene = null;
+  stopSpeech(); scene = null; cut = null;
   game.step = i;
   const s = STEPS[i];
   $("chapter").textContent = s.ch;
-  if (s.story) showStory(s);
+  if (s.scene) playScene(s.scene);
   else if (s.level) startLevel(s.level);
   else showEnd();
 }
-function showStory(s) {
-  showOnly("story");
-  $("storyImg").src = ART[s.story];
-  $("storyImg").alt = s.lines.map((l) => l[1]).join(" ");
-  const box = $("bubbles"); box.innerHTML = "";
-  const els = s.lines.map(([who, text]) => {
-    const d = document.createElement("div");
-    d.className = "bubble";
-    d.innerHTML = `<b>${who}</b>${text}`;
-    box.appendChild(d); return d;
-  });
-  const read = () => speakLines(s.lines, (i) => els.forEach((e, j) => e.classList.toggle("now", j === i)));
-  setControls([
-    { icon: "🔁", label: "Again", color: "gray", tap: true, keys: ["r"], keyName: "R", fn: read },
-    { icon: "▶", label: "Next", color: "green", tap: true, keys: NEXT_KEYS, keyName: "space", fn: next },
-  ]);
-  read();
+/* ---------------- cartoon scenes: the story plays like a video ---------------- */
+// A scene is { bg(c), setup(c), beats: [...], update?(c, dt), front?(c) }.
+// A beat is { say: [who, text, sfx?], do(c), wait: seconds, until(c) }.
+// Beats run in order; a beat ends once its line is spoken, `wait` has passed and `until` is true.
+// Actors are keyed by lowercase speaker name ("mousie", "birdie", "trex", "firetruck"…)
+// so speech bubbles find who is talking.
+const SCENES = {};
+let cut = null;
+
+function actor(draw, x, y, s = 1, more = {}) {
+  return Object.assign({ draw, x, y, s, flip: false, o: {}, tx: null, speed: 160, vy: 0, jy: 0, alpha: 1, rot: 0, visible: true, z: 0, head: 120, fly: false, walk: false, walkScroll: false }, more);
 }
+function moveTo(a, x, speed = 160) { a.tx = x; a.speed = speed; }
+function hop(a, v = 520) { if (a.jy === 0) a.vy = -v; }
+const arrived = (...as) => as.every((a) => a.tx === null);
+const whoKey = (who) => who.toLowerCase().replace(/[^a-z]/g, "");
+
+function playScene(id) {
+  showOnly(null);
+  parts = []; texts = []; shake = 0;
+  cut = { id, def: SCENES[id], t: 0, scroll: 0, scrollSpeed: 0, actors: {}, beat: -1, beatT: 0, talking: false, bubble: null, fade: 1, fadeTo: 0, ending: false, skipAt: 0 };
+  cut.def.setup(cut);
+  setControls([{ icon: "⏩", label: "Skip", color: "gray", keys: [" ", "Enter", "ArrowRight"], keyName: "space", fn: skipBeat }]);
+  nextBeat();
+}
+function nextBeat() {
+  const c = cut;
+  c.beat++; c.beatT = 0; c.bubble = null; c.talking = false;
+  const b = c.def.beats[c.beat];
+  if (!b) { c.ending = true; c.fadeTo = 1; return; }
+  if (b.do) b.do(c);
+  if (b.say) {
+    const [who, text, fx] = b.say;
+    c.bubble = { who, text };
+    c.talking = true;
+    talk(who, text, fx, () => { if (cut === c && c.def.beats[c.beat] === b) c.talking = false; });
+  }
+}
+function skipBeat() {
+  const c = cut;
+  if (!c || c.ending || c.t - c.skipAt < 0.35) return;
+  c.skipAt = c.t;
+  stopSpeech();
+  for (const a of Object.values(c.actors)) if (a.tx !== null) { a.x = a.tx; a.tx = null; }
+  nextBeat();
+}
+// Speak one line; calls done when the voice finishes (or after a reading-time guess).
+function talk(who, text, fx, done) {
+  if (fx && sfx[fx]) sfx[fx]();
+  const guess = 900 + text.length * 65;
+  let over = false;
+  const fin = () => { if (!over) { over = true; clearTimeout(guard); done(); } };
+  const voiceOn = settings.read && "speechSynthesis" in window;
+  const guard = setTimeout(fin, voiceOn ? guess * 2.5 + 2500 : guess);
+  if (!voiceOn) return;
+  stopSpeech();
+  const u = new SpeechSynthesisUtterance(text.replace(/!!+/g, "!").replace(/\?\?+/g, "?"));
+  const v = VOICE[who] || VOICE.Narrator;
+  u.pitch = v.pitch; u.rate = v.rate; if (voice) u.voice = voice;
+  u.onend = fin; u.onerror = fin;
+  speechSynthesis.speak(u);
+}
+function updateCut(dt) {
+  const c = cut;
+  c.t += dt; c.beatT += dt;
+  c.scroll += c.scrollSpeed * dt;
+  for (const a of Object.values(c.actors)) {
+    if (a.tx !== null) {
+      const d = a.tx - a.x, st = a.speed * dt;
+      if (Math.abs(d) <= st) { a.x = a.tx; a.tx = null; } else { a.x += Math.sign(d) * st; a.flip = d < 0; }
+    }
+    a.vy += 2000 * dt; a.jy += a.vy * dt;
+    if (a.jy > 0) { a.jy = 0; a.vy = 0; }
+  }
+  if (c.def.update) c.def.update(c, dt);
+  c.fade += (c.fadeTo - c.fade) * Math.min(1, dt * 5);
+  const b = c.def.beats[c.beat];
+  if (!c.ending && b && !c.talking && c.beatT >= (b.wait ?? (b.say ? 0.35 : 1)) && (!b.until || b.until(c))) nextBeat();
+  if (c.ending && c.fade > 0.96) { cut = null; next(); }
+}
+function drawCut() {
+  const c = cut;
+  c.def.bg(c);
+  const list = Object.values(c.actors).filter((a) => a.visible).sort((a, b) => a.z - b.z);
+  for (const a of list) {
+    ctx.save();
+    ctx.globalAlpha = a.alpha;
+    const walking = a.tx !== null || a.walk || (a.walkScroll && c.scrollSpeed > 0);
+    const bob = a.fly ? Math.sin(c.t * 3 + a.x * 0.01) * 10 : 0;
+    a.draw(a.x, a.y + a.jy + bob, a.s, { t: c.t + a.x * 0.001, walk: walking, flip: a.flip, rot: a.rot, ...a.o });
+    ctx.restore();
+  }
+  if (c.def.front) c.def.front(c);
+  drawFx();
+  if (c.bubble) drawBubble(c);
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, 24); ctx.fillRect(0, H - 24, W, 24);
+  if (c.fade > 0.01) { ctx.fillStyle = `rgba(0,0,0,${Math.min(1, c.fade)})`; ctx.fillRect(0, 0, W, H); }
+}
+const BUBBLE_FONT = 'bold 26px "Chalkboard SE", "Comic Sans MS", cursive';
+function wrapText(text, maxW) {
+  ctx.font = BUBBLE_FONT;
+  const out = []; let line = "";
+  for (const w of text.split(" ")) {
+    const t = line ? line + " " + w : w;
+    if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t;
+  }
+  if (line) out.push(line);
+  return out;
+}
+function drawBubble(c) {
+  const { who, text } = c.bubble;
+  const a = c.actors[whoKey(who)];
+  const lines = wrapText(text, 360);
+  ctx.font = BUBBLE_FONT;
+  const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 40, bh = lines.length * 32 + 26;
+  ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  if (!a || !a.visible) { // narrator caption box
+    const bx = (W - bw) / 2, by = 40;
+    ctx.fillStyle = "#fff6c9"; ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = INK; lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 29 + i * 32));
+    ctx.textBaseline = "alphabetic";
+    return;
+  }
+  const hx = a.x, hy = a.y + a.jy - a.head * a.s - 14;
+  const bx = Math.max(16, Math.min(W - bw - 16, hx - bw / 2)), by = Math.max(34, Math.min(H - bh - 60, hy - bh - 26));
+  const tipX = Math.max(bx + 24, Math.min(bx + bw - 24, hx)), tipY = Math.max(by + bh + 8, hy);
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 22); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(tipX - 14, by + bh - 2); ctx.lineTo(tipX + (hx > tipX ? 10 : -4), tipY); ctx.lineTo(tipX + 14, by + bh - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillRect(tipX - 12, by + bh - 6, 24, 6);
+  ctx.fillStyle = INK; lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 29 + i * 32));
+  ctx.textBaseline = "alphabetic";
+}
+
+/*__SCENES__*/
+
 function showEnd() {
   showOnly("end");
   $("endStats").textContent = `You found ${game.cheese} cheese and won ${game.stars} stars!`;
@@ -461,7 +559,7 @@ function eye(x, y, r = 4) { ell(x, y, r, r * 1.1, INK, 0, false); ell(x + r * 0.
 function drawMouse(x, y, s = 1, o = {}) {
   const t = o.t || 0, walk = o.walk ? Math.sin(t * 14) : 0;
   begin(x, y, s, o.flip, o.rot);
-  const BR = "#a57a52", PINK = "#f2a7a7";
+  const BR = o.color || "#a57a52", PINK = "#f2a7a7";
   // tail
   ctx.strokeStyle = "#c98f7a"; ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(-22, -22); ctx.bezierCurveTo(-60, -10, -70, -60, -50, -70 + Math.sin(t * 5) * 5); ctx.stroke();
@@ -615,17 +713,34 @@ function drawForest(scroll = 0, tint = 0) {
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(W, GROUND); ctx.stroke();
   if (tint) { ctx.fillStyle = `rgba(255,200,120,${tint})`; ctx.fillRect(0, 0, W, H); }
 }
-function drawCave() {
+// Big leaves that sweep past in front of the characters while walking.
+function drawJungleFront(scroll) {
+  const span = 1500;
+  for (let i = 0; i < 5; i++) {
+    const x = ((i * 330 - scroll * 1.5) % span + span) % span - 200;
+    ctx.save(); ctx.translate(x, H + 6);
+    ctx.fillStyle = i % 2 ? "#2f7a2f" : "#3f8a3a"; ctx.strokeStyle = "#245c24"; ctx.lineWidth = 3;
+    for (let k = -2; k <= 2; k++) {
+      ctx.save(); ctx.rotate(k * 0.35 - 0.1);
+      ctx.beginPath(); ctx.ellipse(0, -30, 18, 48, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+}
+function drawCave(scroll = 0, hole = true) {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#3a2e26"); g.addColorStop(1, "#55463a"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   const r = ctx.createRadialGradient(80, 320, 20, 80, 320, 420);
   r.addColorStop(0, "rgba(200,230,150,.55)"); r.addColorStop(1, "rgba(200,230,150,0)"); ctx.fillStyle = r; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#2a211b";
-  for (let i = 0; i < 14; i++) { const sx = i * 75 + 20, sl = 30 + ((i * 47) % 60); poly([sx - 22, 0, sx + 22, 0, sx, sl], "#2a211b", false); }
-  ctx.fillStyle = "#4a3d33"; ctx.beginPath(); ctx.ellipse(820, 280, 120, 170, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#231b16"; ctx.beginPath(); ctx.ellipse(830, 300, 80, 130, 0, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 15; i++) { const sx = ((i * 75 + 20 - scroll * 0.8) % 1125 + 1125) % 1125 - 60, sl = 30 + ((i * 47) % 60); poly([sx - 22, 0, sx + 22, 0, sx, sl], "#2a211b", false); }
+  if (hole) {
+    ctx.fillStyle = "#4a3d33"; ctx.beginPath(); ctx.ellipse(820, 280, 120, 170, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#231b16"; ctx.beginPath(); ctx.ellipse(830, 300, 80, 130, 0, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.fillStyle = "#6b5a4a"; ctx.fillRect(0, GROUND, W, H - GROUND);
-  ctx.fillStyle = "#5a4a3c"; for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.ellipse(i * 90 + 30, GROUND + 40, 30, 10, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = "#5a4a3c"; for (let i = 0; i < 13; i++) { ctx.beginPath(); ctx.ellipse(((i * 90 + 30 - scroll) % 1170 + 1170) % 1170 - 60, GROUND + 40, 30, 10, 0, 0, 7); ctx.fill(); }
   ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(W, GROUND); ctx.stroke();
 }
 function drawCaveMouth(x) {
@@ -914,25 +1029,7 @@ const LEVELS = {
     } }],
     update(s, dt) { s.y += (s.ty - s.y) * Math.min(1, dt * 10); },
     draw(s) {
-      drawForest(300, 0.12);
-      // tree trunk & branches
-      ctx.fillStyle = "#7a5534"; ctx.strokeStyle = INK; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(620, H); ctx.lineTo(650, 120); ctx.lineTo(780, 120); ctx.lineTo(820, H); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#3f8a3a";
-      [[600, 60], [720, 30], [860, 60], [500, 90], [930, 120]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 90, 0, 7); ctx.fill(); });
-      // treehouse
-      poly([440, 160, 830, 160, 830, 175, 440, 175], "#8a5a2b");
-      poly([470, 160, 470, 70, 780, 70, 780, 160], "#c58a4f");
-      poly([450, 75, 625, -10, 800, 75], "#a0522d");
-      poly([520, 95, 560, 95, 560, 135, 520, 135], "#bfe3f5");
-      poly([690, 95, 730, 95, 730, 135, 690, 135], "#bfe3f5");
-      poly([600, 100, 645, 100, 645, 160, 600, 160], "#6b4423");
-      ctx.font = 'bold 18px "Chalkboard SE", "Comic Sans MS", cursive'; ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.fillText("TREE HOUSE", 625, 90);
-      // ladder
-      ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 7;
-      ctx.beginPath(); ctx.moveTo(520, GROUND + 10); ctx.lineTo(530, 170); ctx.moveTo(590, GROUND + 10); ctx.lineTo(590, 170); ctx.stroke();
-      ctx.lineWidth = 6;
-      for (let i = 0; i <= s.total; i++) { const ry = GROUND - i * 30 + 5; ctx.beginPath(); ctx.moveTo(522, ry); ctx.lineTo(590, ry); ctx.stroke(); }
+      drawTreeHouse(s.total);
       drawMouse(555, s.y, 0.9, { t: s.t, walk: Math.abs(s.ty - s.y) > 2 });
       drawBird(720, 230 + Math.sin(s.t * 2) * 12, 0.9, { t: s.t, flip: true });
       ctx.font = 'bold 30px "Chalkboard SE", "Comic Sans MS", cursive'; ctx.textAlign = "left"; ctx.lineWidth = 5; ctx.strokeStyle = INK;
@@ -940,6 +1037,29 @@ const LEVELS = {
     },
   },
 };
+
+// The big tree with the treehouse and a ladder (ladder top is at y = 170, x ≈ 555).
+function drawTreeHouse(rungs = 10, scroll = 300) {
+  drawForest(scroll, 0.12);
+  // tree trunk & branches
+  ctx.fillStyle = "#7a5534"; ctx.strokeStyle = INK; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(620, H); ctx.lineTo(650, 120); ctx.lineTo(780, 120); ctx.lineTo(820, H); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#3f8a3a";
+  [[600, 60], [720, 30], [860, 60], [500, 90], [930, 120]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 90, 0, 7); ctx.fill(); });
+  // treehouse
+  poly([440, 160, 830, 160, 830, 175, 440, 175], "#8a5a2b");
+  poly([470, 160, 470, 70, 780, 70, 780, 160], "#c58a4f");
+  poly([450, 75, 625, -10, 800, 75], "#a0522d");
+  poly([520, 95, 560, 95, 560, 135, 520, 135], "#bfe3f5");
+  poly([690, 95, 730, 95, 730, 135, 690, 135], "#bfe3f5");
+  poly([600, 100, 645, 100, 645, 160, 600, 160], "#6b4423");
+  ctx.font = 'bold 18px "Chalkboard SE", "Comic Sans MS", cursive'; ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.fillText("TREE HOUSE", 625, 90);
+  // ladder
+  ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(520, GROUND + 10); ctx.lineTo(530, 170); ctx.moveTo(590, GROUND + 10); ctx.lineTo(590, 170); ctx.stroke();
+  ctx.lineWidth = 6;
+  for (let i = 0; i <= rungs; i++) { const ry = GROUND - i * 30 + 5; ctx.beginPath(); ctx.moveTo(522, ry); ctx.lineTo(590, ry); ctx.stroke(); }
+}
 
 function startLevel(id) {
   showOnly(null);
@@ -964,6 +1084,15 @@ function frame(now) {
     if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     ctx.clearRect(-50, -50, W + 100, H + 100);
     L.draw(scene); drawFx();
+    ctx.restore();
+  } else if (cut) {
+    updateCut(dt); updFx(dt);
+  }
+  if (cut) {
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    ctx.clearRect(-50, -50, W + 100, H + 100);
+    drawCut();
     ctx.restore();
   }
   requestAnimationFrame(frame);

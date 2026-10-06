@@ -1,6 +1,6 @@
 # Mousie: The Adventure Game
 
-A picture-book game made from Samar's comic *Mousie, Part 1*.
+A cartoon adventure game made from Samar's comic *Mousie, Part 1*. The story plays as animated scenes (Mousie and Birdie walk through the jungle, meet the dinosaurs, and so on), with speech bubbles and read-aloud, and five button games in between.
 
 ## Play on an iPhone or iPad
 Open the game link in Safari and turn the phone sideways. To keep it like an app, tap Share → **Add to Home Screen**.
@@ -22,4 +22,8 @@ There is no way to lose. Turn off **Read to me** or **Sounds** at the top if you
 5. Climb Home: CLIMB to the treehouse
 
 ## Editing
-Game code is in `src/game.html`; book panels are in `art/`. Run `python3 build.py` to rebuild `Mousie.html`.
+Game code and the cartoon engine are in `src/game.html`; each animated scene is its own file in `src/scenes/`. Book art used on the title and end screens is in `art/`.
+
+- Rebuild: `python3 build.py` (writes `Mousie.html`)
+- Film one scene as screenshots: `NODE_PATH=$(npm root -g) node tools/preview.js Mousie.html jungle /tmp/shots`
+- Play the whole game automatically: `NODE_PATH=$(npm root -g) node tools/playthrough.js Mousie.html`
